@@ -5,6 +5,8 @@ import profileRoutes from './profileRoutes.js'
 import connectionRoutes from './connectionRoutes.js'
 import messageRoutes from './messageRoutes.js'
 import notificationRoutes from './notificationRoutes.js'
+import mentorshipRoutes from './mentorshipRoutes.js'
+import jobRoutes from './jobRoutes.js'
 import { csrfProtection, assertDatabaseAvailable } from '../middleware/security.js'
 import { notFound } from '../utils/errors.js'
 
@@ -24,6 +26,8 @@ router.use('/profiles', profileRoutes)
 router.use('/connections', connectionRoutes)
 router.use('/messages', messageRoutes)
 router.use('/notifications', notificationRoutes)
+router.use('/mentorship', mentorshipRoutes)
+router.use('/jobs', jobRoutes)
 
 router.use((req) => {
   throw notFound(`Route ${req.method} ${req.originalUrl}`)

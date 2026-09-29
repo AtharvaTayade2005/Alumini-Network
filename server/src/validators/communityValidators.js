@@ -1,10 +1,22 @@
 import { z } from 'zod'
 import { optionalText, uuidSchema } from './authValidators.js'
 
-export const jobSchema = z.object({
+/**
+ * Validators for the community features.
+ *
+ * Each feature declares a plain object shape first, then wraps it. That is
+ * required because `.refine()`/`.superRefine()` return a ZodEffects, which has
+ * no `.partial()`, so the "update" variants have to be derived from the raw
+ * shape rather than from the finished schema.
+ */
+
+const jobShape = {
   title: z.string().trim().min(3).max(200),
   companyName: z.string().trim().min(2).max(200),
   companyId: uuidSchema.optional().nullable(),
+  companyWebsite: z.string().trim().url().max(255).optional().nullable(),
+  industry: z.string().trim().max(120).optional().nullable(),
+  companyLogoUrl: z.string().trim().url().max(500).optional().nullable(),
   description: z.string().trim().min(50, 'Description must be at least 50 characters').max(20000),
   location: z.string().trim().max(150).optional().nullable(),
   workMode: z.enum(['remote', 'hybrid', 'onsite']).default('onsite'),
@@ -17,17 +29,32 @@ export const jobSchema = z.object({
   deadline: z.coerce.date().optional().nullable(),
   skills: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
   status: z.enum(['draft', 'active']).default('active'),
-}).refine(
-  (data) => data.salaryMin == null || data.salaryMax == null || data.salaryMax >= data.salaryMin,
-  { message: 'Maximum salary must be greater than the minimum', path: ['salaryMax'] },
-).refine(
-  (data) => !data.deadline || data.deadline.getTime() > Date.now() - 86_400_000,
-  { message: 'Deadline must be a future date', path: ['deadline'] },
-)
+}
 
-export const jobUpdateSchema = jobSchema.partial().extend({
-  status: z.enum(['draft', 'active', 'closed']).optional(),
-})
+/** Cross-field rules shared by create and update, applied only when both sides are present. */
+function refineJob(data, ctx) {
+  if (data.salaryMin != null && data.salaryMax != null && data.salaryMax < data.salaryMin) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['salaryMax'],
+      message: 'Maximum salary must be greater than the minimum',
+    })
+  }
+  if (data.deadline && data.deadline.getTime() <= Date.now() - 86_400_000) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['deadline'],
+      message: 'Deadline must be a future date',
+    })
+  }
+}
+
+export const jobSchema = z.object(jobShape).superRefine(refineJob)
+
+export const jobUpdateSchema = z.object(jobShape)
+  .partial()
+  .extend({ status: z.enum(['draft', 'active', 'closed']).optional() })
+  .superRefine(refineJob)
 
 export const jobQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -45,21 +72,54 @@ export const jobQuerySchema = z.object({
   sort: z.enum(['newest', 'oldest', 'title', 'deadline', 'salary']).default('newest'),
 })
 
+export const companySchema = z.object({
+  name: z.string().trim().min(2).max(200),
+  website: z.string().trim().url().max(255).optional().nullable(),
+  industry: z.string().trim().max(120).optional().nullable(),
+  location: z.string().trim().max(150).optional().nullable(),
+  logoUrl: z.string().trim().url().max(500).optional().nullable(),
+})
+
+export const companyUpdateSchema = companySchema.partial()
+
 export const applicationSchema = z.object({
   coverLetter: optionalText(5000),
   resumeUrl: z.string().trim().max(500).optional().nullable(),
   externalUrl: z.string().trim().url('Enter a valid application URL').max(500).optional().nullable(),
-}).refine(
-  (data) => Boolean(data.resumeUrl || data.externalUrl),
-  { message: 'Attach a resume or provide an external application URL', path: ['resumeUrl'] },
-)
+}).superRefine((data, ctx) => {
+  if (!data.resumeUrl && !data.externalUrl) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['resumeUrl'],
+      message: 'Attach a resume or provide an external application URL',
+    })
+  }
+})
 
 export const applicationStatusSchema = z.object({
-  status: z.enum(['submitted', 'under_review', 'shortlisted', 'rejected', 'accepted']),
+  status: z.enum(['submitted', 'under_review', 'shortlisted', 'rejected', 'accepted', 'withdrawn']),
   note: optionalText(1000),
 })
 
-export const eventSchema = z.object({
+export const applicationQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  status: z.enum(['submitted', 'under_review', 'shortlisted', 'rejected', 'accepted', 'withdrawn']).optional(),
+  jobId: uuidSchema.optional(),
+})
+
+export const companyQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().trim().max(120).optional(),
+})
+
+export const jobModerationSchema = z.object({
+  action: z.enum(['approve', 'remove']),
+  reason: optionalText(1000),
+})
+
+const eventShape = {
   title: z.string().trim().min(3).max(200),
   description: z.string().trim().min(20, 'Description must be at least 20 characters').max(20000),
   eventDate: z.coerce.date(),
@@ -75,21 +135,39 @@ export const eventSchema = z.object({
   maxAttendees: z.coerce.number().int().min(1).max(100_000).optional().nullable(),
   registrationDeadline: z.coerce.date().optional().nullable(),
   status: z.enum(['draft', 'published']).default('published'),
-}).refine(
-  (data) => data.endTime > data.startTime,
-  { message: 'End time must be after the start time', path: ['endTime'] },
-).refine(
-  (data) => !data.registrationDeadline || !data.eventDate
-    || data.registrationDeadline <= new Date(data.eventDate),
-  { message: 'Registration deadline must fall on or before the event date', path: ['registrationDeadline'] },
-).refine(
-  (data) => (data.latitude == null) === (data.longitude == null),
-  { message: 'Latitude and longitude must be provided together', path: ['latitude'] },
-)
+}
 
-export const eventUpdateSchema = eventSchema.partial().extend({
-  status: z.enum(['draft', 'published', 'cancelled', 'completed']).optional(),
-})
+function refineEvent(data, ctx) {
+  if (data.endTime && data.startTime && data.endTime <= data.startTime) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['endTime'],
+      message: 'End time must be after the start time',
+    })
+  }
+  if (data.registrationDeadline && data.eventDate
+      && data.registrationDeadline > new Date(data.eventDate)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['registrationDeadline'],
+      message: 'Registration deadline must fall on or before the event date',
+    })
+  }
+  if ((data.latitude == null) !== (data.longitude == null)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['latitude'],
+      message: 'Latitude and longitude must be provided together',
+    })
+  }
+}
+
+export const eventSchema = z.object(eventShape).superRefine(refineEvent)
+
+export const eventUpdateSchema = z.object(eventShape)
+  .partial()
+  .extend({ status: z.enum(['draft', 'published', 'cancelled', 'completed']).optional() })
+  .superRefine(refineEvent)
 
 export const eventQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

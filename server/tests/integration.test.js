@@ -650,6 +650,626 @@ describe('messaging', () => {
   })
 })
 
+describe('mentorship', () => {
+  let mentor
+  let mentee
+  let mentorToken
+  let menteeToken
+
+  const careerGoal = 'I want to move from backend engineering into engineering management.'
+
+  before(async () => {
+    // createUser makes alumni accounts that are verified and open to mentoring
+    // with a capacity of 1, and students for mentees.
+    mentor = await createUser({ role: 'ALUMNI', email: `mentor.${uniq()}@example.edu` })
+    mentee = await createUser({ role: 'STUDENT', email: `mentee.${uniq()}@example.edu` })
+    mentorToken = await loginAs(mentor)
+    menteeToken = await loginAs(mentee)
+
+    // Mentorship requires an existing connection.
+    const req1 = await request(app)
+      .post('/api/connections')
+      .set(asAuth(mentorToken))
+      .send({ userId: mentee.id })
+    assert.equal(req1.status, 201, JSON.stringify(req1.body))
+    await request(app)
+      .patch(`/api/connections/${req1.body.data.id}`)
+      .set(asAuth(menteeToken))
+      .send({ action: 'accept' })
+  })
+
+  it('requires a connection before requesting mentorship', async () => {
+    const stranger = await createUser({ email: `stranger.${uniq()}@example.edu` })
+    const strangerToken = await loginAs(stranger)
+    const res = await request(app)
+      .post('/api/mentorship/requests')
+      .set(asAuth(strangerToken))
+      .send({ mentorId: mentor.id, careerGoal, areaOfInterest: 'Engineering' })
+    assert.equal(res.status, 400, JSON.stringify(res.body))
+    assert.match(res.body.message, /Connect with this member/)
+  })
+
+  it('rejects a career goal that is too short', async () => {
+    const res = await request(app)
+      .post('/api/mentorship/requests')
+      .set(asAuth(menteeToken))
+      .send({ mentorId: mentor.id, careerGoal: 'short', areaOfInterest: 'Engineering' })
+    assert.equal(res.status, 422, JSON.stringify(res.body))
+  })
+
+  it('rejects requesting mentorship from yourself', async () => {
+    const res = await request(app)
+      .post('/api/mentorship/requests')
+      .set(asAuth(mentorToken))
+      .send({ mentorId: mentor.id, careerGoal, areaOfInterest: 'Engineering' })
+    assert.equal(res.status, 400, JSON.stringify(res.body))
+  })
+
+  it('refuses a mentor who is not accepting requests', async () => {
+    await query('UPDATE alumni_profiles SET is_open_to_mentor = FALSE WHERE user_id = $1',
+      [mentor.id])
+    const res = await request(app)
+      .post('/api/mentorship/requests')
+      .set(asAuth(menteeToken))
+      .send({ mentorId: mentor.id, careerGoal, areaOfInterest: 'Engineering' })
+    assert.equal(res.status, 400, JSON.stringify(res.body))
+    await query('UPDATE alumni_profiles SET is_open_to_mentor = TRUE WHERE user_id = $1',
+      [mentor.id])
+  })
+
+  it('lists available mentors with open slots', async () => {
+    const res = await request(app)
+      .get('/api/mentorship/mentors')
+      .set(asAuth(menteeToken))
+    assert.equal(res.status, 200, JSON.stringify(res.body))
+    const found = res.body.data.find((row) => row.id === mentor.id)
+    assert.ok(found, 'the mentor should be discoverable')
+    assert.equal(found.openSlots, 1)
+    assert.ok(found.name.length > 0)
+  })
+
+  it('lets a mentee request, and a mentor accept, a mentorship', async () => {
+    const created = await request(app)
+      .post('/api/mentorship/requests')
+      .set(asAuth(menteeToken))
+      .send({
+        mentorId: mentor.id,
+        careerGoal,
+        areaOfInterest: 'Engineering management',
+        message: 'I would value your advice.',
+        preferredMode: 'video',
+      })
+    assert.equal(created.status, 201, JSON.stringify(created.body))
+    assert.equal(created.body.data.status, 'pending')
+    assert.equal(created.body.data.direction, 'outgoing')
+    assert.equal(created.body.data.role, 'mentee')
+    assert.equal(created.body.data.peer.id, mentor.id)
+
+    // The mentor sees the same request from the other side.
+    const inbox = await request(app)
+      .get('/api/mentorship/requests?role=mentor&status=pending')
+      .set(asAuth(mentorToken))
+    assert.equal(inbox.status, 200, JSON.stringify(inbox.body))
+    const mine = inbox.body.data.find((row) => row.id === created.body.data.id)
+    assert.ok(mine, 'the mentor should see the incoming request')
+    assert.equal(mine.direction, 'incoming')
+    assert.equal(mine.peer.id, mentee.id)
+    assert.equal(inbox.body.meta.counts.pending, 1)
+
+    // A third party must not be able to answer it.
+    const intruder = await createUser({ email: `intruder.${uniq()}@example.edu` })
+    const intruderToken = await loginAs(intruder)
+    const hijack = await request(app)
+      .patch(`/api/mentorship/requests/${created.body.data.id}`)
+      .set(asAuth(intruderToken))
+      .send({ status: 'accepted' })
+    assert.equal(hijack.status, 403, JSON.stringify(hijack.body))
+
+    const accepted = await request(app)
+      .patch(`/api/mentorship/requests/${created.body.data.id}`)
+      .set(asAuth(mentorToken))
+      .send({ status: 'accepted', responseNote: 'Happy to help.' })
+    assert.equal(accepted.status, 200, JSON.stringify(accepted.body))
+    assert.equal(accepted.body.data.request.status, 'accepted')
+    assert.equal(accepted.body.data.relationship.status, 'active')
+    assert.equal(accepted.body.data.relationship.role, 'mentor')
+    assert.equal(accepted.body.data.relationship.peer.id, mentee.id)
+  })
+
+  it('notifies the mentor of a new request and the mentee of the decision', async () => {
+    const mentorFeed = await request(app)
+      .get('/api/notifications?type=mentorship_request')
+      .set(asAuth(mentorToken))
+    assert.ok(mentorFeed.body.data.some((n) => n.type === 'mentorship_request'))
+
+    const menteeFeed = await request(app)
+      .get('/api/notifications?type=mentorship_accepted')
+      .set(asAuth(menteeToken))
+    assert.ok(menteeFeed.body.data.some((n) => n.type === 'mentorship_accepted'))
+  })
+
+  it('blocks a duplicate request while one is already accepted', async () => {
+    const res = await request(app)
+      .post('/api/mentorship/requests')
+      .set(asAuth(menteeToken))
+      .send({ mentorId: mentor.id, careerGoal, areaOfInterest: 'Engineering' })
+    assert.equal(res.status, 409, JSON.stringify(res.body))
+    assert.match(res.body.message, /active mentorship/)
+  })
+
+  it('lists the active mentorship for both participants', async () => {
+    for (const token of [mentorToken, menteeToken]) {
+      const res = await request(app)
+        .get('/api/mentorship/mentorships?status=active')
+        .set(asAuth(token))
+      assert.equal(res.status, 200, JSON.stringify(res.body))
+      assert.equal(res.body.data.length, 1, JSON.stringify(res.body))
+      assert.equal(res.body.data[0].status, 'active')
+    }
+  })
+
+  it('refuses to end a mentorship the caller is not part of', async () => {
+    const outsider = await createUser({ email: `outsider.${uniq()}@example.edu` })
+    const outsiderToken = await loginAs(outsider)
+    const list = await request(app)
+      .get('/api/mentorship/mentorships?status=active')
+      .set(asAuth(mentorToken))
+    const relationshipId = list.body.data[0].id
+
+    const res = await request(app)
+      .patch(`/api/mentorship/mentorships/${relationshipId}/end`)
+      .set(asAuth(outsiderToken))
+      .send({ endReason: 'Not my mentorship' })
+    assert.equal(res.status, 403, JSON.stringify(res.body))
+  })
+
+  it('lets a participant end the mentorship and notifies the other', async () => {
+    const list = await request(app)
+      .get('/api/mentorship/mentorships?status=active')
+      .set(asAuth(mentorToken))
+    const relationshipId = list.body.data[0].id
+
+    const res = await request(app)
+      .patch(`/api/mentorship/mentorships/${relationshipId}/end`)
+      .set(asAuth(menteeToken))
+      .send({ endReason: 'Goal reached' })
+    assert.equal(res.status, 200, JSON.stringify(res.body))
+    assert.equal(res.body.data.status, 'ended')
+    assert.equal(res.body.data.endReason, 'Goal reached')
+
+    const again = await request(app)
+      .patch(`/api/mentorship/mentorships/${relationshipId}/end`)
+      .set(asAuth(menteeToken))
+      .send({ endReason: 'Again' })
+    assert.equal(again.status, 409, JSON.stringify(again.body))
+
+    const feed = await request(app)
+      .get('/api/notifications?type=mentorship_ended')
+      .set(asAuth(mentorToken))
+    assert.ok(feed.body.data.some((n) => n.type === 'mentorship_ended'))
+  })
+
+  it('allows a new request after the previous one was declined', async () => {
+    const newMentor = await createUser({ role: 'ALUMNI', email: `m2.${uniq()}@example.edu` })
+    const newMentorToken = await loginAs(newMentor)
+
+    // Free a slot: the earlier mentorship consumed the first mentor's capacity.
+    const c1 = await request(app)
+      .post('/api/connections').set(asAuth(menteeToken)).send({ userId: newMentor.id })
+    await request(app)
+      .patch(`/api/connections/${c1.body.data.id}`)
+      .set(asAuth(newMentorToken)).send({ action: 'accept' })
+
+    const first = await request(app)
+      .post('/api/mentorship/requests')
+      .set(asAuth(menteeToken))
+      .send({ mentorId: newMentor.id, careerGoal, areaOfInterest: 'Product' })
+    assert.equal(first.status, 201, JSON.stringify(first.body))
+
+    const declined = await request(app)
+      .patch(`/api/mentorship/requests/${first.body.data.id}`)
+      .set(asAuth(newMentorToken))
+      .send({ status: 'rejected', responseNote: 'Full right now.' })
+    assert.equal(declined.status, 200, JSON.stringify(declined.body))
+    assert.equal(declined.body.data.request.status, 'rejected')
+    assert.equal(declined.body.data.relationship, null)
+
+    // The pair row is reused rather than duplicating the pair.
+    const second = await request(app)
+      .post('/api/mentorship/requests')
+      .set(asAuth(menteeToken))
+      .send({ mentorId: newMentor.id, careerGoal, areaOfInterest: 'Product' })
+    assert.equal(second.status, 201, JSON.stringify(second.body))
+    assert.equal(second.body.data.status, 'pending')
+    assert.equal(second.body.data.id, first.body.data.id, 'the same pair row is revived')
+  })
+
+  it('rejects a short career goal before touching the database', async () => {
+    const res = await request(app)
+      .post('/api/mentorship/requests')
+      .set(asAuth(menteeToken))
+      .send({ mentorId: mentor.id, careerGoal: 'I want to grow', areaOfInterest: 'X' })
+    assert.equal(res.status, 422)
+  })
+
+  it('requires authentication', async () => {
+    const res = await request(app).get('/api/mentorship/requests')
+    assert.equal(res.status, 401)
+  })
+})
+
+describe('jobs', () => {
+  before(resetUsers)
+
+  const longDescription = 'We are looking for a backend engineer to work on our '
+    + 'payments platform. You will design APIs, own services in production, and '
+    + 'mentor junior engineers across the team.'
+
+  let poster, posterToken, applicant, applicantToken, student, studentToken
+  let jobId
+
+  before(async () => {
+    poster = await createUser({ email: `poster.${uniq()}@example.edu` })
+    posterToken = await loginAs(poster)
+    applicant = await createUser({ email: `applicant.${uniq()}@example.edu` })
+    applicantToken = await loginAs(applicant)
+    student = await createUser({ role: 'STUDENT', email: `stud.${uniq()}@example.edu` })
+    studentToken = await loginAs(student)
+  })
+
+  it('lets alumni post a job and reuses the company row', async () => {
+    const res = await request(app)
+      .post('/api/jobs')
+      .set(asAuth(posterToken))
+      .send({
+        title: 'Senior Backend Engineer',
+        companyName: 'Northwind Labs',
+        companyWebsite: 'https://northwind.example.com',
+        industry: 'Software',
+        description: longDescription,
+        location: 'Remote',
+        workMode: 'remote',
+        employmentType: 'full_time',
+        salaryMin: 120_000,
+        salaryMax: 165_000,
+        salaryCurrency: 'USD',
+        experienceLevel: 'senior',
+        applicationUrl: 'https://northwind.example.com/apply',
+        skills: ['Node.js', 'PostgreSQL'],
+        status: 'active',
+      })
+    assert.equal(res.status, 201, JSON.stringify(res.body))
+    assert.equal(res.body.data.status, 'active')
+    assert.equal(res.body.data.companyName, 'Northwind Labs')
+    assert.equal(res.body.data.postedBy.id, poster.id)
+    assert.ok(res.body.data.companyId, 'the company should be resolved')
+    jobId = res.body.data.id
+    const names = res.body.data.skills.map((s) => s.name.toLowerCase()).sort()
+    assert.deepEqual(names, ['node.js', 'postgresql'])
+
+    // Posting for the same employer again must not create a second company.
+    const again = await request(app)
+      .post('/api/jobs')
+      .set(asAuth(posterToken))
+      .send({
+        title: 'Platform Engineer',
+        companyName: 'northwind labs',
+        description: longDescription,
+        workMode: 'hybrid',
+        employmentType: 'full_time',
+        experienceLevel: 'mid',
+        status: 'active',
+      })
+    assert.equal(again.status, 201, JSON.stringify(again.body))
+    assert.equal(again.body.data.companyId, res.body.data.companyId)
+
+    await query('DELETE FROM jobs WHERE id = $1', [again.body.data.id])
+  })
+
+  it('refuses to let students post', async () => {
+    const res = await request(app)
+      .post('/api/jobs')
+      .set(asAuth(studentToken))
+      .send({
+        title: 'Intern Role',
+        companyName: 'Northwind Labs',
+        description: longDescription,
+        workMode: 'onsite',
+        employmentType: 'internship',
+        experienceLevel: 'entry',
+        status: 'active',
+      })
+    assert.equal(res.status, 403, JSON.stringify(res.body))
+  })
+
+  it('rejects a short description and a past deadline before writing', async () => {
+    const before = await query('SELECT COUNT(*)::int AS c FROM jobs')
+    const short = await request(app)
+      .post('/api/jobs')
+      .set(asAuth(posterToken))
+      .send({
+        title: 'Tiny Role',
+        companyName: 'Northwind Labs',
+        description: 'Do things',
+        workMode: 'onsite',
+        employmentType: 'full_time',
+        experienceLevel: 'entry',
+        status: 'active',
+      })
+    assert.equal(short.status, 422, JSON.stringify(short.body))
+
+    const past = await request(app)
+      .post('/api/jobs')
+      .set(asAuth(posterToken))
+      .send({
+        title: 'Stale Role',
+        companyName: 'Northwind Labs',
+        description: longDescription,
+        workMode: 'onsite',
+        employmentType: 'full_time',
+        experienceLevel: 'entry',
+        deadline: '2020-01-01',
+        status: 'active',
+      })
+    assert.equal(past.status, 422, JSON.stringify(past.body))
+
+    const afterCount = await query('SELECT COUNT(*)::int AS c FROM jobs')
+    assert.equal(afterCount.rows[0].c, before.rows[0].c)
+  })
+
+  it('lists and filters the board', async () => {
+    const all = await request(app).get('/api/jobs').set(asAuth(applicantToken))
+    assert.equal(all.status, 200, JSON.stringify(all.body))
+    assert.equal(all.body.meta.total, 1)
+    const job = all.body.data[0]
+    assert.equal(job.hasApplied, false)
+    assert.equal(job.isSaved, false)
+
+    const remote = await request(app)
+      .get('/api/jobs?workMode=remote&employmentType=full_time&sort=salary')
+      .set(asAuth(applicantToken))
+    assert.equal(remote.status, 200)
+    assert.equal(remote.body.data.length, 1)
+
+    const onsite = await request(app)
+      .get('/api/jobs?workMode=onsite').set(asAuth(applicantToken))
+    assert.equal(onsite.body.data.length, 0)
+
+    const bySkill = await request(app)
+      .get('/api/jobs?skill=postgresql').set(asAuth(applicantToken))
+    assert.equal(bySkill.body.data.length, 1)
+
+    const bySearch = await request(app)
+      .get('/api/jobs?search=backend').set(asAuth(applicantToken))
+    assert.equal(bySearch.body.data.length, 1)
+    const noMatch = await request(app)
+      .get('/api/jobs?search=quantum').set(asAuth(applicantToken))
+    assert.equal(noMatch.body.data.length, 0)
+  })
+
+  it('returns the job with its company and skills', async () => {
+    const res = await request(app)
+      .get(`/api/jobs/${jobId}`)
+      .set(asAuth(applicantToken))
+    assert.equal(res.status, 200, JSON.stringify(res.body))
+    assert.equal(res.body.data.id, jobId)
+    assert.equal(res.body.data.skills.length, 2)
+    assert.equal(res.body.data.companyLogoUrl, null)
+  })
+
+  it('requires an attachment when applying', async () => {
+    const res = await request(app)
+      .post(`/api/jobs/${jobId}/applications`)
+      .set(asAuth(applicantToken))
+      .send({ coverLetter: 'I would love to join.' })
+    assert.equal(res.status, 422, JSON.stringify(res.body))
+  })
+
+  it('applies, blocks a duplicate, and notifies the poster', async () => {
+    const res = await request(app)
+      .post(`/api/jobs/${jobId}/applications`)
+      .set(asAuth(applicantToken))
+      .send({
+        coverLetter: 'I would love to join.',
+        resumeUrl: 'https://example.com/resume.pdf',
+      })
+    assert.equal(res.status, 201, JSON.stringify(res.body))
+    assert.equal(res.body.data.status, 'submitted')
+    assert.equal(res.body.data.jobTitle, 'Senior Backend Engineer')
+
+    const dup = await request(app)
+      .post(`/api/jobs/${jobId}/applications`)
+      .set(asAuth(applicantToken))
+      .send({ resumeUrl: 'https://example.com/resume.pdf' })
+    assert.equal(dup.status, 409, JSON.stringify(dup.body))
+
+    const feed = await request(app)
+      .get('/api/notifications')
+      .set(asAuth(posterToken))
+    assert.equal(feed.status, 200)
+    assert.ok(
+      feed.body.data.some((n) => n.type === 'application_received'),
+      'the poster should be notified of the application',
+    )
+  })
+
+  it('does not let the poster apply to their own job', async () => {
+    const res = await request(app)
+      .post(`/api/jobs/${jobId}/applications`)
+      .set(asAuth(posterToken))
+      .send({ resumeUrl: 'https://example.com/resume.pdf' })
+    assert.equal(res.status, 400, JSON.stringify(res.body))
+  })
+
+  it('keeps applicants private from other members', async () => {
+    const res = await request(app)
+      .get(`/api/jobs/${jobId}/applications`)
+      .set(asAuth(studentToken))
+    assert.equal(res.status, 403, JSON.stringify(res.body))
+  })
+
+  it('lets the poster review and notifies the applicant', async () => {
+    const mine = await request(app)
+      .get('/api/jobs/applications')
+      .set(asAuth(applicantToken))
+    assert.equal(mine.status, 200, JSON.stringify(mine.body))
+    const application = mine.body.data[0]
+    assert.equal(application.status, 'submitted')
+    assert.equal(application.jobId, jobId)
+
+    const list = await request(app)
+      .get(`/api/jobs/${jobId}/applications?status=submitted`)
+      .set(asAuth(posterToken))
+    assert.equal(list.status, 200, JSON.stringify(list.body))
+    assert.equal(list.body.meta.total, 1)
+    assert.equal(list.body.data[0].applicant.id, applicant.id)
+
+    const review = await request(app)
+      .patch(`/api/jobs/${jobId}/applications/${application.id}`)
+      .set(asAuth(posterToken))
+      .send({ status: 'shortlisted' })
+    assert.equal(review.status, 200, JSON.stringify(review.body))
+    assert.equal(review.body.data.status, 'shortlisted')
+
+    const feed = await request(app)
+      .get('/api/notifications')
+      .set(asAuth(applicantToken))
+    assert.ok(
+      feed.body.data.some((n) => n.type === 'application_status'),
+      'the applicant should see the status change',
+    )
+  })
+
+  it('saves and unsaves a job', async () => {
+    const save = await request(app)
+      .post(`/api/jobs/${jobId}/save`).set(asAuth(applicantToken))
+    assert.equal(save.status, 200, JSON.stringify(save.body))
+    assert.equal(save.body.data.saved, true)
+
+    // Saving twice is idempotent rather than an error.
+    const again = await request(app)
+      .post(`/api/jobs/${jobId}/save`).set(asAuth(applicantToken))
+    assert.equal(again.status, 200)
+    assert.equal(again.body.data.created, false)
+
+    const saved = await request(app).get('/api/jobs/saved').set(asAuth(applicantToken))
+    assert.equal(saved.status, 200, JSON.stringify(saved.body))
+    assert.equal(saved.body.meta.total, 1)
+    assert.equal(saved.body.data[0].isSaved, true)
+
+    const unsave = await request(app)
+      .delete(`/api/jobs/saved/${jobId}`).set(asAuth(applicantToken))
+    assert.equal(unsave.status, 200)
+    assert.equal(unsave.body.data.saved, false)
+
+    const empty = await request(app).get('/api/jobs/saved').set(asAuth(applicantToken))
+    assert.equal(empty.body.meta.total, 0)
+  })
+
+  it('keeps drafts out of the public board but visible to the poster', async () => {
+    const draft = await request(app)
+      .post('/api/jobs')
+      .set(asAuth(posterToken))
+      .send({
+        title: 'Confidential Research Lead',
+        companyName: 'Northwind Labs',
+        description: longDescription,
+        workMode: 'onsite',
+        employmentType: 'full_time',
+        experienceLevel: 'lead',
+        status: 'draft',
+      })
+    assert.equal(draft.status, 201, JSON.stringify(draft.body))
+    const draftId = draft.body.data.id
+
+    const publicView = await request(app)
+      .get(`/api/jobs/${draftId}`).set(asAuth(applicantToken))
+    assert.equal(publicView.status, 404, JSON.stringify(publicView.body))
+
+    const own = await request(app)
+      .get(`/api/jobs/${draftId}`).set(asAuth(posterToken))
+    assert.equal(own.status, 200)
+
+    const board = await request(app).get('/api/jobs').set(asAuth(applicantToken))
+    assert.ok(!board.body.data.some((j) => j.id === draftId))
+
+    const mine = await request(app)
+      .get('/api/jobs?postedByMe=true').set(asAuth(posterToken))
+    assert.equal(mine.status, 200, JSON.stringify(mine.body))
+    assert.ok(mine.body.data.some((j) => j.id === draftId))
+
+    await query('DELETE FROM jobs WHERE id = $1', [draftId])
+  })
+
+  it('stops a non-poster from editing or deleting', async () => {
+    const edit = await request(app)
+      .put(`/api/jobs/${jobId}`)
+      .set(asAuth(applicantToken))
+      .send({ title: 'Hijacked Title' })
+    assert.equal(edit.status, 403, JSON.stringify(edit.body))
+
+    const del = await request(app)
+      .delete(`/api/jobs/${jobId}`).set(asAuth(applicantToken))
+    assert.equal(del.status, 403, JSON.stringify(del.body))
+  })
+
+  it('lets only staff moderate', async () => {
+    const staff = await createUser({ role: 'STAFF', email: `staff.${uniq()}@example.edu` })
+    const staffToken = await loginAs(staff)
+
+    const asMember = await request(app)
+      .patch(`/api/jobs/${jobId}/moderate`)
+      .set(asAuth(applicantToken))
+      .send({ action: 'remove' })
+    assert.equal(asMember.status, 403, JSON.stringify(asMember.body))
+
+    const removed = await request(app)
+      .patch(`/api/jobs/${jobId}/moderate`)
+      .set(asAuth(staffToken))
+      .send({ action: 'remove' })
+    assert.equal(removed.status, 200, JSON.stringify(removed.body))
+    assert.equal(removed.body.data.status, 'removed')
+
+    // A removed posting is no longer reachable by the public.
+    const hidden = await request(app)
+      .get(`/api/jobs/${jobId}`).set(asAuth(applicantToken))
+    assert.equal(hidden.status, 404)
+
+    const restored = await request(app)
+      .patch(`/api/jobs/${jobId}/moderate`)
+      .set(asAuth(staffToken))
+      .send({ action: 'approve' })
+    assert.equal(restored.status, 200, JSON.stringify(restored.body))
+    assert.equal(restored.body.data.status, 'active')
+  })
+
+  it('lists companies and their open roles', async () => {
+    const res = await request(app).get('/api/jobs/companies').set(asAuth(applicantToken))
+    assert.equal(res.status, 200, JSON.stringify(res.body))
+    const company = res.body.data.find((c) => c.name === 'Northwind Labs')
+    assert.ok(company, 'the posted company should be listed')
+    assert.equal(company.openJobCount, 1)
+
+    const detail = await request(app)
+      .get(`/api/jobs/companies/${company.id}`).set(asAuth(applicantToken))
+    assert.equal(detail.status, 200, JSON.stringify(detail.body))
+    assert.equal(detail.body.data.jobs.length, 1)
+    assert.equal(detail.body.data.jobs[0].id, jobId)
+  })
+
+  it('rejects a bad company id instead of crashing', async () => {
+    const res = await request(app)
+      .get('/api/jobs/companies/00000000-0000-0000-0000-000000000000')
+      .set(asAuth(applicantToken))
+    assert.equal(res.status, 404, JSON.stringify(res.body))
+  })
+
+  it('requires authentication', async () => {
+    const res = await request(app).get('/api/jobs')
+    assert.equal(res.status, 401)
+  })
+})
+
 describe('health', () => {
   it('reports service and database status', async () => {
     const res = await request(app).get('/api/health')

@@ -40,3 +40,12 @@ export function validate({ body, query, params }) {
 export function getQuery(req) {
   return req.validatedQuery ?? req.query
 }
+
+/**
+ * Path parameters. Unlike the query string, req.params is a plain writable
+ * property, so validate() assigns the parsed result straight to it and there
+ * is no separate accessor needed.
+ */
+export function getParams(req) {
+  return req.params
+}
