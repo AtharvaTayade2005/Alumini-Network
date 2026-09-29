@@ -1,7 +1,9 @@
+import { query } from '../config/database.js'
 import * as jobModel from '../models/jobModel.js'
 import * as notificationService from './notificationService.js'
 import * as auditService from './auditService.js'
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors.js'
+import { ROLES, hasAnyRole } from '../middleware/rbac.js'
 
 /**
  * Job board, company directory, applications and saved jobs.
@@ -10,21 +12,23 @@ import { badRequest, conflict, forbidden, notFound } from '../utils/errors.js'
  * but cannot post or moderate.
  */
 
-const POSTER_ROLES = new Set(['alumni', 'staff', 'admin'])
+/** Roles allowed to publish and manage their own postings. */
+const POSTER_ROLES = [ROLES.ALUMNI, ROLES.MODERATOR, ROLES.ADMIN]
+/** Roles allowed to moderate postings they do not own. */
+const MODERATOR_ROLES = [ROLES.MODERATOR, ROLES.ADMIN]
+
 const APPLICATION_STATUSES = new Set([
   'submitted', 'under_review', 'shortlisted', 'rejected', 'accepted', 'withdrawn',
 ])
 
 function assertCanPost(user) {
-  if (!POSTER_ROLES.has(user.role)) {
+  if (!hasAnyRole(user, POSTER_ROLES)) {
     throw forbidden('Only alumni and staff can post jobs')
   }
 }
 
-function assertCanPostOrModerate(user) {
-  if (user.role !== 'staff' && user.role !== 'admin') {
-    throw forbidden('Only staff can moderate jobs')
-  }
+function isStaff(user) {
+  return hasAnyRole(user, MODERATOR_ROLES)
 }
 
 /** Loads a job, throwing when missing. */
@@ -171,11 +175,16 @@ export async function getJob(jobId, viewer) {
 
 function isVisibleToStaff(job, viewer) {
   if (!viewer) return false
-  return job.posted_by === viewer.id || viewer.role === 'staff' || viewer.role === 'admin'
+  return job.posted_by === viewer.id || isStaff(viewer)
 }
 
 export async function listJobs(viewer, filters) {
-  const { rows, total } = await jobModel.listJobs(viewer.id, filters)
+  // postedByMe shows every status the caller owns, so it bypasses the
+  // active-only filter applied to the public board.
+  const { rows, total } = await jobModel.listJobs(viewer.id, {
+    ...filters,
+    mineOnly: filters.postedByMe === 'true',
+  })
   return {
     jobs: rows.map((r) => jobModel.formatJob(r)),
     total,
@@ -211,7 +220,7 @@ export async function getCompany(companyId, viewer, filters = {}) {
 export async function applyToJob(user, jobId, payload, context = {}) {
   const job = await loadJob(jobId)
   if (job.status !== 'active') throw badRequest('This job is no longer accepting applications')
-  if (new Date(job.deadline) < new Date()) {
+  if (job.deadline && new Date(job.deadline) < new Date()) {
     throw badRequest('The application deadline for this job has passed')
   }
   if (job.posted_by === user.id) {
@@ -253,12 +262,30 @@ export async function applyToJob(user, jobId, payload, context = {}) {
     context,
   })
 
-  return jobModel.formatApplication(application)
+  return getApplication(application.id)
+}
+
+/** Reloads an application with its job and applicant joined in. */
+async function getApplication(applicationId) {
+  const { rows } = await query(
+    `SELECT a.*, j.title AS job_title, j.company_name,
+            u.id AS applicant_id, u.first_name || ' ' || u.last_name AS applicant_name,
+            u.avatar_url AS applicant_avatar_url, u.email AS applicant_email,
+            COALESCE(ap.current_position, sp.degree) AS applicant_headline
+     FROM job_applications a
+     JOIN jobs j ON j.id = a.job_id
+     JOIN users u ON u.id = a.applicant_id
+     LEFT JOIN alumni_profiles ap ON ap.user_id = u.id
+     LEFT JOIN student_profiles sp ON sp.user_id = u.id
+     WHERE a.id = $1`,
+    [applicationId],
+  )
+  return rows[0] ? jobModel.formatApplication(rows[0]) : null
 }
 
 export async function listApplicationsForJob(user, jobId, filters) {
   const job = await loadJob(jobId)
-  if (job.posted_by !== user.id && user.role !== 'staff' && user.role !== 'admin') {
+  if (job.posted_by !== user.id && !isStaff(user)) {
     throw forbidden('Only the poster can view applicants')
   }
   const { rows, total } = await jobModel.listApplicationsForJob(jobId, filters)
@@ -278,14 +305,14 @@ export async function reviewApplication(user, applicationId, status, context = {
   if (!application) throw notFound('Application')
 
   const job = await loadJob(application.job_id)
-  if (job.posted_by !== user.id && user.role !== 'staff' && user.role !== 'admin') {
+  if (job.posted_by !== user.id && !isStaff(user)) {
     throw forbidden('Only the poster can review applicants')
   }
   if (application.status === 'withdrawn') {
     throw conflict('This applicant withdrew their application')
   }
 
-  const updated = await jobModel.updateApplicationStatus(applicationId, status)
+  await jobModel.updateApplicationStatus(applicationId, status)
   await notificationService.notify({
     userId: application.applicant_id,
     type: 'application_status',
@@ -303,7 +330,7 @@ export async function reviewApplication(user, applicationId, status, context = {
     context,
   })
 
-  return jobModel.formatApplication(updated)
+  return getApplication(applicationId)
 }
 
 /** The applicant withdrawing their own application. */
@@ -317,7 +344,7 @@ export async function withdrawApplication(user, applicationId, context = {}) {
     throw conflict('This application is already withdrawn')
   }
 
-  const updated = await jobModel.updateApplicationStatus(applicationId, 'withdrawn')
+  await jobModel.updateApplicationStatus(applicationId, 'withdrawn')
   await auditService.record({
     actorId: user.id,
     action: 'application.withdrawn',
@@ -325,7 +352,7 @@ export async function withdrawApplication(user, applicationId, context = {}) {
     entityId: applicationId,
     context,
   })
-  return jobModel.formatApplication(updated)
+  return getApplication(applicationId)
 }
 
 export async function listMyApplications(user, filters) {
@@ -363,7 +390,7 @@ export async function listSavedJobs(user, filters) {
 }
 
 export async function moderateJob(user, jobId, action, context = {}) {
-  assertCanPostOrModerate(user)
+  if (!isStaff(user)) throw forbidden('Only staff can moderate jobs')
   const job = await loadJob(jobId)
   const target = action === 'remove' ? 'removed' : 'active'
   if (job.status === target) return jobModel.formatJob(job)

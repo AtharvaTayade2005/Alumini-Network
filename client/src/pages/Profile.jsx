@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
-import { profiles } from '../services/api.js'
+import { profiles, oauth } from '../services/api.js'
 import {
   Alert, Badge, Button, Card, CardHeader, Checkbox, Field, FieldErrorSummary,
   Input, LoadingBlock, Select, Spinner, Textarea,
@@ -202,7 +202,83 @@ export default function Profile() {
       </form>
 
       <PrivacyPanel />
+      <SignInMethodsPanel />
     </div>
+  )
+}
+
+/** Lets a member connect or disconnect provider sign-in. */
+function SignInMethodsPanel() {
+  const [state, setState] = useState({ loading: true, accounts: [], providers: [] })
+  const [message, setMessage] = useState(null)
+  const [busy, setBusy] = useState(null)
+
+  function refresh() {
+    setState((prev) => ({ ...prev, loading: true }))
+    oauth.accounts()
+      .then((response) => setState({ loading: false, ...response.data }))
+      .catch((error) => setMessage({ tone: 'error', text: error.message }))
+  }
+
+  useEffect(refresh, [])
+
+  // The provider redirects back here after a successful link.
+  useEffect(() => {
+    const linked = new URLSearchParams(window.location.search).get('linked')
+    if (linked) setMessage({ tone: 'success', text: `${linked} sign-in connected.` })
+  }, [])
+
+  async function disconnect(provider) {
+    setBusy(provider)
+    setMessage(null)
+    try {
+      await oauth.unlink(provider)
+      setMessage({ tone: 'success', text: `${provider} sign-in removed.` })
+      refresh()
+    } catch (error) {
+      setMessage({ tone: 'error', text: error.message })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  if (state.loading || !state.providers.length) return null
+  const linked = new Set(state.accounts.map((account) => account.provider))
+
+  return (
+    <Card className="mt-6">
+      <CardHeader
+        title="Sign-in methods"
+        description="Connect a provider to sign in without your password."
+      />
+      {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
+      <ul className="mt-4 divide-y divide-slate-200">
+        {state.providers.map((provider) => {
+          const connected = linked.has(provider.provider)
+          return (
+            <li key={provider.provider} className="flex items-center justify-between py-3">
+              <span className="text-sm text-slate-800">{provider.label}</span>
+              {connected ? (
+                <Button
+                  variant="ghost"
+                  disabled={busy === provider.provider}
+                  onClick={() => disconnect(provider.provider)}
+                >
+                  {busy === provider.provider ? 'Removing' : 'Disconnect'}
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  onClick={() => window.location.assign(oauth.linkUrl(provider.provider))}
+                >
+                  Connect
+                </Button>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
   )
 }
 

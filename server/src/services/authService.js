@@ -160,7 +160,11 @@ export async function login({ email, password }, context = {}) {
   return { user: publicUser(user), ...session }
 }
 
-async function issueSession(user, context) {
+/**
+ * Creates the access token, refresh token and CSRF token for a user. Shared by
+ * the password and OAuth sign-in paths so both produce identical sessions.
+ */
+export async function issueSession(user, context = {}) {
   const refreshToken = generateToken(48)
   const expiresAt = await tokenModel.createRefreshToken({
     userId: user.id,

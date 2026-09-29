@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { after, before, describe, it } from 'node:test'
+import { after, afterEach, before, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import request from 'supertest'
 import { startTestDatabase, stopTestDatabase } from './helpers/testDatabase.js'
@@ -34,7 +34,7 @@ async function createUser({ role = 'ALUMNI', email, password = 'Str0ngPass!23' }
      SELECT $1, id FROM roles WHERE LOWER(name) = LOWER($2)`,
     [id, role],
   )
-  if (role === 'ALUMNI') {
+  if (role === 'ALUMNI' || role === 'MODERATOR' || role === 'ADMIN') {
     await query(
       `INSERT INTO alumni_profiles (user_id, graduation_year, degree, department,
          current_company, current_position, industry, bio, city, country,
@@ -1028,7 +1028,7 @@ describe('jobs', () => {
     const remote = await request(app)
       .get('/api/jobs?workMode=remote&employmentType=full_time&sort=salary')
       .set(asAuth(applicantToken))
-    assert.equal(remote.status, 200)
+    assert.equal(remote.status, 200, JSON.stringify(remote.body?.error ?? remote.body))
     assert.equal(remote.body.data.length, 1)
 
     const onsite = await request(app)
@@ -1214,7 +1214,7 @@ describe('jobs', () => {
   })
 
   it('lets only staff moderate', async () => {
-    const staff = await createUser({ role: 'STAFF', email: `staff.${uniq()}@example.edu` })
+    const staff = await createUser({ role: 'MODERATOR', email: `staff.${uniq()}@example.edu` })
     const staffToken = await loginAs(staff)
 
     const asMember = await request(app)
@@ -1267,6 +1267,264 @@ describe('jobs', () => {
   it('requires authentication', async () => {
     const res = await request(app).get('/api/jobs')
     assert.equal(res.status, 401)
+  })
+})
+
+describe('oauth', () => {
+  before(resetUsers)
+
+  const realFetch = globalThis.fetch
+  let user
+
+  before(async () => {
+    user = await createUser({ email: `oauth.${uniq()}@example.edu` })
+  })
+
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  /**
+   * The provider endpoints are stubbed so the flow is exercised end to end
+   * without real credentials. Discovery is only used by the SSO provider.
+   */
+  function stubProvider(profile, { tokenStatus = 200, userinfoStatus = 200 } = {}) {
+    globalThis.fetch = async (url) => {
+      const href = String(url)
+      if (href.includes('token')) {
+        return {
+          ok: tokenStatus === 200,
+          status: tokenStatus,
+          json: async () => ({ access_token: 'provider-access-token' }),
+        }
+      }
+      if (href.includes('userinfo')) {
+        return {
+          ok: userinfoStatus === 200,
+          status: userinfoStatus,
+          json: async () => profile,
+        }
+      }
+      if (href.includes('openid-configuration')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            authorization_endpoint: 'https://sso.example.edu/authorize',
+            token_endpoint: 'https://sso.example.edu/token',
+            userinfo_endpoint: 'https://sso.example.edu/userinfo',
+          }),
+        }
+      }
+      throw new Error(`unexpected fetch: ${href}`)
+    }
+  }
+
+  it('reports no providers when nothing is configured', async () => {
+    const res = await request(app).get('/api/auth/oauth/providers')
+    assert.equal(res.status, 200, JSON.stringify(res.body))
+    assert.deepEqual(res.body.data.providers, [])
+  })
+
+  it('refuses to start a flow for an unconfigured provider', async () => {
+    const res = await request(app).get('/api/auth/oauth/google')
+    assert.equal(res.status, 403, JSON.stringify(res.body))
+  })
+
+  it('rejects an unknown provider', async () => {
+    const res = await request(app).get('/api/auth/oauth/myspace')
+    assert.equal(res.status, 422, JSON.stringify(res.body))
+  })
+
+  it('builds a provider URL, refuses linking when signed out, and links when signed in', async () => {
+    const { default: env } = await import('../src/config/env.js')
+    env.oauth.google.clientId = 'google-client-id'
+    env.oauth.google.clientSecret = 'google-client-secret'
+    env.apiBaseUrl = 'http://localhost:3000'
+
+    env.oauth.stateSecret = env.oauth.stateSecret || 'test-state-secret-for-oauth-signing'
+
+    try {
+      const anonymous = await request(app).get('/api/auth/oauth/google?link=true')
+      assert.equal(anonymous.status, 400, JSON.stringify(anonymous.body))
+
+      const started = await request(app)
+        .get('/api/auth/oauth/google?redirectTo=/messages')
+      assert.equal(started.status, 302, JSON.stringify(started.body))
+      const location = new URL(started.headers.location)
+      assert.equal(location.origin, 'https://accounts.google.com')
+      assert.equal(location.searchParams.get('client_id'), 'google-client-id')
+      assert.ok(location.searchParams.get('state'))
+
+      const token = await loginAs(user)
+      const linked = await request(app)
+        .get('/api/auth/oauth/google/link')
+        .set(asAuth(token))
+      assert.equal(linked.status, 302, JSON.stringify(linked.body))
+      const linkedLocation = new URL(linked.headers.location)
+      assert.ok(linkedLocation.searchParams.get('state'))
+    } finally {
+      env.oauth.google.clientId = ''
+      env.oauth.google.clientSecret = ''
+    }
+  })
+
+  it('uses PKCE and discovery for the SSO provider', async () => {
+    const { default: env } = await import('../src/config/env.js')
+    env.oauth.sso.issuerUrl = 'https://sso.example.edu'
+    env.oauth.sso.clientId = 'sso-client-id'
+    env.oauth.sso.clientSecret = 'sso-client-secret'
+    env.apiBaseUrl = 'http://localhost:3000'
+
+    env.oauth.stateSecret = env.oauth.stateSecret || 'test-state-secret-for-oauth-signing'
+
+    try {
+      // Discovery is a real network call, so the well-known document is stubbed.
+      globalThis.fetch = async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          authorization_endpoint: 'https://sso.example.edu/authorize',
+          token_endpoint: 'https://sso.example.edu/token',
+          userinfo_endpoint: 'https://sso.example.edu/userinfo',
+        }),
+      })
+
+      const res = await request(app).get('/api/auth/oauth/sso')
+      assert.equal(res.status, 302, JSON.stringify(res.body))
+      const location = new URL(res.headers.location)
+      assert.equal(location.origin, 'https://sso.example.edu')
+      assert.equal(location.searchParams.get('code_challenge_method'), 'S256')
+      assert.ok(location.searchParams.get('code_challenge'))
+      assert.ok(location.searchParams.get('nonce'))
+    } finally {
+      env.oauth.sso.issuerUrl = ''
+      env.oauth.sso.clientId = ''
+      env.oauth.sso.clientSecret = ''
+    }
+  })
+
+  it('rejects a tampered or expired state instead of signing anyone in', async () => {
+    const { default: env } = await import('../src/config/env.js')
+    env.oauth.google.clientId = 'google-client-id'
+    env.oauth.google.clientSecret = 'google-client-secret'
+    env.apiBaseUrl = 'http://localhost:3000'
+
+    env.oauth.stateSecret = env.oauth.stateSecret || 'test-state-secret-for-oauth-signing'
+
+    try {
+      const started = await request(app).get('/api/auth/oauth/google')
+      const state = new URL(started.headers.location).searchParams.get('state')
+      const [body, signature] = state.split('.')
+      const forged = `${Buffer.from(JSON.stringify({
+        provider: 'google', redirectTo: '/admin', expiresAt: Date.now() + 60_000,
+      })).toString('base64url')}.${signature}`
+
+      const res = await request(app).get(
+        `/api/auth/oauth/google/callback?code=abc&state=${encodeURIComponent(forged)}`,
+      )
+      assert.equal(res.status, 400, JSON.stringify(res.body))
+      assert.equal(res.body.message, 'Invalid OAuth state')
+      assert.ok(body.length > 0)
+    } finally {
+      env.oauth.google.clientId = ''
+      env.oauth.google.clientSecret = ''
+    }
+  })
+
+  it('signs a member in through a completed provider callback', async () => {
+    const { default: env } = await import('../src/config/env.js')
+    env.oauth.google.clientId = 'google-client-id'
+    env.oauth.google.clientSecret = 'google-client-secret'
+    env.apiBaseUrl = 'http://localhost:3000'
+
+    env.oauth.stateSecret = env.oauth.stateSecret || 'test-state-secret-for-oauth-signing'
+    const token = await loginAs(user)
+
+    try {
+      // Link the provider to the existing account, then sign in with it.
+      const link = await request(app)
+        .get('/api/auth/oauth/google/link')
+        .set(asAuth(token))
+      const state = new URL(link.headers.location).searchParams.get('state')
+      assert.ok(state, 'linking should produce a signed state')
+
+      stubProvider({ sub: 'google-abc', email: user.email, given_name: 'Test' })
+      const callback = await request(app)
+        .get(`/api/auth/oauth/google/callback?code=auth-code&state=${encodeURIComponent(state)}`)
+
+      assert.equal(callback.status, 302, JSON.stringify(callback.body))
+      assert.equal(callback.headers.location, '/profile?linked=google')
+
+      // The provider session works, so a refresh cookie was issued too.
+      const cookies = callback.headers['set-cookie'] ?? []
+      assert.ok(cookies.some((c) => c.startsWith('refresh_token=')))
+
+      const accounts = await query(
+        'SELECT provider FROM oauth_accounts WHERE user_id = $1', [user.id],
+      )
+      assert.equal(accounts.rows.length, 1)
+      assert.equal(accounts.rows[0].provider, 'google')
+    } finally {
+      env.oauth.google.clientId = ''
+      env.oauth.google.clientSecret = ''
+    }
+  })
+
+  it('refuses to sign in an email that has no account', async () => {
+    const { default: env } = await import('../src/config/env.js')
+    env.oauth.google.clientId = 'google-client-id'
+    env.oauth.google.clientSecret = 'google-client-secret'
+    env.apiBaseUrl = 'http://localhost:3000'
+
+    env.oauth.stateSecret = env.oauth.stateSecret || 'test-state-secret-for-oauth-signing'
+
+    try {
+      const started = await request(app).get('/api/auth/oauth/google')
+      const state = new URL(started.headers.location).searchParams.get('state')
+      stubProvider({
+        sub: 'google-unknown', email: `nobody.${uniq()}@example.edu`, given_name: 'Nobody',
+      })
+      const res = await request(app)
+        .get(`/api/auth/oauth/google/callback?code=auth-code&state=${encodeURIComponent(state)}`)
+      assert.equal(res.status, 409, JSON.stringify(res.body))
+      assert.match(res.body.message, /Register with a password first/)
+    } finally {
+      env.oauth.google.clientId = ''
+      env.oauth.google.clientSecret = ''
+    }
+  })
+
+  it('lists and unlinks provider accounts', async () => {
+    const token = await loginAs(user)
+    await query(
+      `INSERT INTO oauth_accounts (user_id, provider, provider_user_id, email)
+       VALUES ($1, 'google', 'google-123', $2)`,
+      [user.id, user.email],
+    )
+
+    const listed = await request(app)
+      .get('/api/auth/oauth/accounts').set(asAuth(token))
+    assert.equal(listed.status, 200, JSON.stringify(listed.body))
+    assert.ok(listed.body.data.accounts.some((a) => a.provider === 'google'))
+
+    // A password still exists, so the last sign-in method is not removed.
+    const unlinked = await request(app)
+      .delete('/api/auth/oauth/google/link').set(asAuth(token))
+    assert.equal(unlinked.status, 200, JSON.stringify(unlinked.body))
+    assert.equal(unlinked.body.data.unlinked, 'google')
+
+    const gone = await request(app)
+      .get('/api/auth/oauth/accounts').set(asAuth(token))
+    assert.ok(!gone.body.data.accounts.some((a) => a.provider === 'google'))
+  })
+
+  it('requires authentication to manage linked providers', async () => {
+    assert.equal((await request(app).get('/api/auth/oauth/accounts')).status, 401)
+    assert.equal(
+      (await request(app).delete('/api/auth/oauth/google/link')).status,
+      401,
+    )
   })
 })
 

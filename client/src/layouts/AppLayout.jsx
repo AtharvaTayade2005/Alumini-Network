@@ -10,13 +10,13 @@ const MEMBER_LINKS = [
   { to: '/directory', label: 'Directory' },
   { to: '/messages', label: 'Messages' },
   { to: '/notifications', label: 'Notifications', badge: 'unread' },
+  { to: '/jobs', label: 'Jobs' },
+  { to: '/mentorship', label: 'Mentorship' },
   { to: '/profile', label: 'My profile' },
 ]
 
 const PLANNED_LINKS = [
-  { to: '/jobs', label: 'Jobs' },
   { to: '/events', label: 'Events' },
-  { to: '/mentorship', label: 'Mentorship' },
 ]
 
 function navClass({ isActive }) {
@@ -104,8 +104,8 @@ export default function AppLayout() {
 
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-6 text-xs text-slate-500">
-          Alumni Network Portal. Directory, connections, messaging and
-          notifications are live; jobs, events, mentorship and donations are
+          Alumni Network Portal. Directory, connections, messaging,
+          mentorship and the job board are live; events and donations are
           still in progress.
         </div>
       </footer>

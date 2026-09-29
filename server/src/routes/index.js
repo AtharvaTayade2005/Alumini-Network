@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import healthRoutes from './healthRoutes.js'
 import authRoutes from './authRoutes.js'
+import oauthRoutes from './oauthRoutes.js'
 import profileRoutes from './profileRoutes.js'
 import connectionRoutes from './connectionRoutes.js'
 import messageRoutes from './messageRoutes.js'
@@ -22,6 +23,7 @@ router.use(csrfProtection)
 // does not match a route must 404 rather than 401, so no blanket authenticate
 // middleware is applied here.
 router.use('/auth', authRoutes)
+router.use('/auth', oauthRoutes)
 router.use('/profiles', profileRoutes)
 router.use('/connections', connectionRoutes)
 router.use('/messages', messageRoutes)

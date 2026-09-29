@@ -8,6 +8,13 @@ const TONES = {
   connection_request: 'blue',
   connection_accepted: 'green',
   new_message: 'purple',
+  mentorship_request: 'blue',
+  mentorship_accepted: 'green',
+  mentorship_declined: 'slate',
+  mentorship_ended: 'slate',
+  application_received: 'blue',
+  application_status: 'amber',
+  job_moderated: 'amber',
   admin_notice: 'amber',
   verification_result: 'blue',
 }
@@ -29,6 +36,8 @@ const FILTERS = [
   ['connection_request', 'Connection requests'],
   ['connection_accepted', 'Connections'],
   ['new_message', 'Messages'],
+  ['mentorship_request', 'Mentorship requests'],
+  ['application_received', 'Job applications'],
 ]
 
 export default function Notifications() {

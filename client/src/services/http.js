@@ -162,4 +162,6 @@ export const api = {
   delete: (path, options) => send(path, { ...options, method: 'DELETE' }),
   refresh: refreshAccessToken,
   tokenStore,
+  /** Absolute API URL, for the few flows that redirect the browser instead of using fetch. */
+  url: buildUrl,
 }

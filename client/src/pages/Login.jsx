@@ -1,9 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { oauth } from '../services/api.js'
 import {
   Alert, Button, Card, Field, FieldErrorSummary, Input, Spinner,
 } from '../components/ui.jsx'
+
+const PROVIDER_ERRORS = {
+  access_denied: 'Sign-in was cancelled.',
+  no_google_account: 'No Google account matched an existing member.',
+  no_linkedin_account: 'No LinkedIn account matched an existing member.',
+  no_sso_account: 'No university account matched an existing member.',
+  server_error: 'The provider could not complete sign-in. Please try again.',
+}
 
 export default function Login() {
   const { login } = useAuth()
@@ -13,8 +22,28 @@ export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [providers, setProviders] = useState([])
 
   const redirectTo = location.state?.from ?? '/dashboard'
+
+  // Only configured providers are offered, so nobody clicks a dead button.
+  useEffect(() => {
+    let active = true
+    oauth.providers()
+      .then((res) => {
+        if (active) setProviders(res.data.providers)
+      })
+      .catch(() => {
+        if (active) setProviders([])
+      })
+    return () => { active = false }
+  }, [])
+
+  // The provider redirects back with a failure query param rather than JSON.
+  useEffect(() => {
+    const code = new URLSearchParams(location.search).get('oauth_error')
+    if (code) setError(new Error(PROVIDER_ERRORS[code] ?? 'Provider sign-in failed.'))
+  }, [location.search])
 
   function update(field) {
     return (event) => setForm((prev) => ({ ...prev, [field]: event.target.value }))
@@ -78,6 +107,37 @@ export default function Login() {
             {submitting ? <><Spinner className="border-white/40 border-t-white" /> Signing in</> : 'Sign in'}
           </Button>
         </form>
+
+        {providers.length ? (
+          <div className="mt-6">
+            <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-slate-500">
+              <span className="h-px flex-1 bg-slate-200" />
+              or continue with
+              <span className="h-px flex-1 bg-slate-200" />
+            </div>
+            <div className="mt-4 grid gap-2">
+              {providers.map((provider) => (
+                <Button
+                  key={provider.provider}
+                  type="button"
+                  variant="secondary"
+                  className="w-full justify-center"
+                  onClick={() => {
+                    window.location.assign(
+                      oauth.startUrl(provider.provider, { redirectTo }),
+                    )
+                  }}
+                >
+                  {provider.label}
+                </Button>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              Provider sign-in only works for an existing account. Set a password once to
+              connect {providers.length === 1 ? 'this provider' : 'a provider'}.
+            </p>
+          </div>
+        ) : null}
 
         <p className="mt-5 text-sm text-slate-600">
           No account yet?{' '}

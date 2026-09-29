@@ -1,4 +1,4 @@
-import { query } from '../config/database.js'
+import { query, withTransaction } from '../config/database.js'
 import * as mentorshipModel from '../models/mentorshipModel.js'
 import * as connectionService from './connectionService.js'
 import * as notificationService from './notificationService.js'
@@ -61,12 +61,14 @@ export async function requestMentorship(menteeId, payload, context = {}) {
 
   await assertEligibleMentor(mentorId, menteeId)
 
+  // Mentorship is meant to build on a real relationship, so a merely pending
+  // connection request is not enough.
   const connectionState = await connectionService.getRequestState(menteeId, mentorId)
-  if (connectionState === 'none') {
-    throw badRequest('Connect with this member before requesting mentorship')
-  }
   if (connectionState === 'blocked') {
     throw forbidden('This member is not available for mentorship')
+  }
+  if (connectionState !== 'connected') {
+    throw badRequest('Connect with this member before requesting mentorship')
   }
 
   const created = await mentorshipModel.createRequest({
@@ -109,19 +111,31 @@ export async function respondToRequest(mentorId, requestId, payload, context = {
     throw conflict('This request has already been answered')
   }
 
-  const updated = await mentorshipModel.updateRequestStatus(requestId, {
-    status: payload.status,
-    responseNote: payload.responseNote,
-  })
-  if (!updated) throw notFound('Mentorship request')
+  // Accepting changes two rows that must agree with each other, and the mentor
+  // may have filled up since the request was made, so both happen under one
+  // transaction with the mentor's row locked.
+  const relationship = await withTransaction(async (db) => {
+    if (payload.status === 'accepted') {
+      await mentorshipModel.assertCapacityWithLock(request.mentor_id, request.mentee_id, db)
+    }
+    const row = await mentorshipModel.updateRequestStatus(requestId, {
+      status: payload.status,
+      responseNote: payload.responseNote,
+    }, db)
+    if (!row) throw notFound('Mentorship request')
 
-  let relationship = null
+    return payload.status === 'accepted'
+      ? mentorshipModel.createRelationship({
+        requestId,
+        mentorId: request.mentor_id,
+        menteeId: request.mentee_id,
+      }, db)
+      : null
+  })
+
+  // Notifications and the audit entry are written after the commit, so a
+  // rolled-back acceptance never leaves a misleading record behind.
   if (payload.status === 'accepted') {
-    relationship = await mentorshipModel.createRelationship({
-      requestId,
-      mentorId: request.mentor_id,
-      menteeId: request.mentee_id,
-    })
     await notificationService.notify({
       userId: request.mentee_id,
       type: 'mentorship_accepted',

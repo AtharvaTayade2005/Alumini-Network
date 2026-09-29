@@ -158,13 +158,11 @@ export async function incrementViewCount(id) {
 }
 
 export async function listJobs(viewerId, filters) {
+  // Conditions carry their own values so the same set can be rendered twice:
+  // once numbered after the viewer placeholder for the data query, and once
+  // from $1 for the count query.
   const conditions = []
-  const params = [viewerId]
-
-  const add = (clause, value) => {
-    params.push(value)
-    conditions.push(clause.replace('?', `$${params.length}`))
-  }
+  const add = (clause, ...values) => conditions.push({ clause, values })
 
   // Non-posters only ever browse live listings.
   if (filters.mineOnly) {
@@ -179,19 +177,31 @@ export async function listJobs(viewerId, filters) {
   if (filters.location) add('j.location ILIKE ?', `%${filters.location}%`)
   if (filters.salaryMin) add('(j.salary_max IS NULL OR j.salary_max >= ?)', filters.salaryMin)
   if (filters.search) {
+    // Three columns are searched, so the value is repeated per placeholder.
     add('(j.title ILIKE ? OR j.company_name ILIKE ? OR j.description ILIKE ?)',
-      `%${filters.search}%`)
+      `%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`)
   }
   if (filters.skill) {
-    params.push(filters.skill)
-    const idx = params.length
-    conditions.push(
-      `EXISTS (SELECT 1 FROM job_skills js JOIN skills s ON s.id = js.skill_id
-               WHERE js.job_id = j.id AND LOWER(s.name) = LOWER($${idx}))`,
-    )
+    add(`EXISTS (SELECT 1 FROM job_skills js JOIN skills s ON s.id = js.skill_id
+                    WHERE js.job_id = j.id AND LOWER(s.name) = LOWER(?))`, filters.skill)
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+  /**
+   * Renders every condition with placeholders numbered consecutively from
+   * `start`, so multi-clause conditions such as the search filter consume one
+   * placeholder per value. The counter is shared across conditions on purpose.
+   */
+  const renderAll = (start) => {
+    let offset = start
+    return conditions
+      .map((c) => c.clause.replace(/\?/g, () => `$${offset++}`))
+      .join(' AND ')
+  }
+
+  const conditionValues = conditions.flatMap((c) => c.values)
+  const where = conditions.length ? `WHERE ${renderAll(2)}` : ''
+  const dataParams = [viewerId, ...conditionValues]
+
   const orderBy = {
     newest: 'j.created_at DESC',
     oldest: 'j.created_at ASC',
@@ -200,17 +210,17 @@ export async function listJobs(viewerId, filters) {
     salary: 'j.salary_max DESC NULLS LAST',
   }[filters.sort] ?? 'j.created_at DESC'
 
-  const countParams = params.slice(1)
   const { rows: counts } = await query(
-    `SELECT COUNT(*)::int AS c FROM jobs j ${where}`,
-    countParams,
+    `SELECT COUNT(*)::int AS c FROM jobs j
+     ${conditions.length ? `WHERE ${renderAll(1)}` : ''}`,
+    conditionValues,
   )
 
   const { rows } = await query(
     `SELECT ${JOB_SELECT} ${JOB_JOINS} ${where}
      ORDER BY ${orderBy}
-     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-    [...params, filters.limit, filters.offset],
+     LIMIT $${dataParams.length + 1} OFFSET $${dataParams.length + 2}`,
+    [...dataParams, filters.limit, filters.offset],
   )
 
   return { rows, total: counts[0].c }

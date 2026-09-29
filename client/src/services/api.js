@@ -71,6 +71,52 @@ export const messages = {
   search: (q, limit = 20) => api.get('/messages/search', { params: { q, limit } }),
 }
 
+export const mentorship = {
+  mentors: (params) => api.get('/mentorship/mentors', { params }),
+  requests: (params) => api.get('/mentorship/requests', { params }),
+  mentorships: (params) => api.get('/mentorship/mentorships', { params }),
+  request: (payload) => api.post('/mentorship/requests', payload),
+  respond: (requestId, payload) => api.patch(`/mentorship/requests/${requestId}`, payload),
+  cancel: (requestId) => api.delete(`/mentorship/requests/${requestId}`),
+  end: (relationshipId, endReason) =>
+    api.patch(`/mentorship/mentorships/${relationshipId}/end`, { endReason }),
+  complete: (relationshipId) =>
+    api.patch(`/mentorship/mentorships/${relationshipId}/complete`),
+}
+
+export const jobs = {
+  list: (params) => api.get('/jobs', { params }),
+  byId: (id) => api.get(`/jobs/${id}`),
+  create: (payload) => api.post('/jobs', payload),
+  update: (id, payload) => api.put(`/jobs/${id}`, payload),
+  remove: (id) => api.delete(`/jobs/${id}`),
+  apply: (id, payload) => api.post(`/jobs/${id}/applications`, payload),
+  applicationsForJob: (id, params) => api.get(`/jobs/${id}/applications`, { params }),
+  review: (jobId, applicationId, status) =>
+    api.patch(`/jobs/${jobId}/applications/${applicationId}`, { status }),
+  myApplications: (params) => api.get('/jobs/applications', { params }),
+  withdraw: (applicationId) =>
+    api.patch(`/jobs/applications/${applicationId}/withdraw`),
+  save: (id) => api.post(`/jobs/${id}/save`),
+  unsave: (id) => api.delete(`/jobs/saved/${id}`),
+  saved: (params) => api.get('/jobs/saved', { params }),
+  companies: (params) => api.get('/jobs/companies', { params }),
+  company: (id, params) => api.get(`/jobs/companies/${id}`, { params }),
+  moderate: (id, action) => api.patch(`/jobs/${id}/moderate`, { action }),
+}
+
+/**
+ * OAuth sign-in. `startUrl` is a full browser navigation rather than an XHR,
+ * because the provider redirects the whole window back to the API.
+ */
+export const oauth = {
+  providers: () => api.get('/auth/oauth/providers'),
+  accounts: () => api.get('/auth/oauth/accounts'),
+  unlink: (provider) => api.delete(`/auth/oauth/${provider}/link`),
+  startUrl: (provider, params = {}) => api.url(`/auth/oauth/${provider}`, params),
+  linkUrl: (provider) => api.url(`/auth/oauth/${provider}/link`),
+}
+
 export const notifications = {
   list: (params) => api.get('/notifications', { params }),
   unreadCount: (type) => api.get('/notifications/unread-count', { params: { type } }),

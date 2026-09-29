@@ -1,4 +1,5 @@
 import { query } from '../config/database.js'
+import { badRequest, conflict, notFound } from '../utils/errors.js'
 
 /**
  * Mentorship requests and relationships. All rows are shaped for the viewer,
@@ -99,8 +100,8 @@ export async function createRequest({
   return rows[0] ?? null
 }
 
-export async function updateRequestStatus(id, { status, responseNote }) {
-  const { rows } = await query(
+export async function updateRequestStatus(id, { status, responseNote }, db = query) {
+  const { rows } = await db(
     `UPDATE mentorship_requests
      SET status = $2, response_note = $3, responded_at = NOW(), updated_at = NOW()
      WHERE id = $1
@@ -121,8 +122,8 @@ export async function cancelRequest(id) {
   return rows[0] ?? null
 }
 
-export async function createRelationship({ requestId, mentorId, menteeId }) {
-  const { rows } = await query(
+export async function createRelationship({ requestId, mentorId, menteeId }, db = query) {
+  const { rows } = await db(
     `INSERT INTO mentorship_relationships (request_id, mentor_id, mentee_id)
      VALUES ($1,$2,$3)
      ON CONFLICT (request_id) DO UPDATE SET status = 'active', ended_at = NULL
@@ -130,6 +131,34 @@ export async function createRelationship({ requestId, mentorId, menteeId }) {
     [requestId, mentorId, menteeId],
   )
   return rows[0]
+}
+
+/**
+ * Locks the mentor's row and re-checks capacity. Accepting a request has to
+ * confirm the mentor still has room, because the count at request time may be
+ * stale by the time the mentor replies.
+ */
+export async function assertCapacityWithLock(mentorId, menteeId, db = query) {
+  const { rows } = await db(
+    `SELECT COALESCE(ap.mentorship_capacity, 1) AS capacity,
+            (SELECT COUNT(*)::int FROM mentorship_relationships r
+              WHERE r.mentor_id = $1 AND r.mentee_id <> $2 AND r.status = 'active') AS taken,
+            ap.is_open_to_mentor, ap.verification_status
+     FROM users u
+     LEFT JOIN alumni_profiles ap ON ap.user_id = u.id
+     WHERE u.id = $1
+     FOR UPDATE OF u`,
+    [mentorId, menteeId],
+  )
+  const mentor = rows[0]
+  if (!mentor) throw notFound('Mentor')
+  if (!mentor.is_open_to_mentor || mentor.verification_status !== 'verified') {
+    throw badRequest('That member is not available for mentorship')
+  }
+  if (mentor.taken >= mentor.capacity) {
+    throw conflict('That mentor is now at capacity')
+  }
+  return mentor
 }
 
 export async function findRelationshipById(id) {

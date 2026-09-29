@@ -119,6 +119,12 @@ export const config = {
     stateSecret: process.env.OAUTH_STATE_SECRET ?? '',
   },
 
+  /**
+   * Public origin of this API. OAuth redirect URIs are absolute, so the
+   * provider needs to know where to send the browser back to.
+   */
+  apiBaseUrl: (process.env.API_BASE_URL ?? '').replace(/\/$/, ''),
+
   payments: {
     provider: process.env.PAYMENT_PROVIDER ?? 'stripe',
     currency: process.env.DONATION_CURRENCY ?? 'USD',
