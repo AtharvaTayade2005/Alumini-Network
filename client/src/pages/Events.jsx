@@ -1,10 +1,16 @@
-import PagePlaceholder from '../components/PagePlaceholder.jsx'
+import ComingSoon from './ComingSoon.jsx'
 
 export default function Events() {
   return (
-    <PagePlaceholder
+    <ComingSoon
       title="Events & Reunions"
-      description="Event listings, RSVPs and reminders are planned for a later phase."
+      description="Host reunions, workshops and talks, then manage attendance."
+      planned={[
+        'Create events with venue, capacity and registration deadlines',
+        'RSVP and manage your own registrations',
+        'Email and in-app reminders before each event',
+        'Cancel events and notify all registrants',
+      ]}
     />
   )
 }

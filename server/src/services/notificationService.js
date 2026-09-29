@@ -1,6 +1,6 @@
 import { query } from '../config/database.js'
 import * as mailService from './mailService.js'
-import { getRealtime } from '../sockets/index.js'
+import { emitToUsers } from '../sockets/index.js'
 
 const EMAIL_TEMPLATES = {
   mentorship_request: 'mentorship_request',
@@ -32,7 +32,7 @@ export async function notify({
          VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
         [userId, type, title, body, link, actorId],
       )
-      getRealtime()?.toUser(userId).emit('notification', formatNotification(rows[0]))
+      await emitToUsers([userId], 'notification', formatNotification(rows[0]))
     }
   }
 

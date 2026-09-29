@@ -5,7 +5,7 @@ import { asyncHandler } from '../middleware/errorHandler.js'
 import { getQuery } from '../middleware/validate.js'
 import { sendCreated, sendSuccess } from '../utils/response.js'
 import { badRequest, notFound } from '../utils/errors.js'
-import { getRealtime } from '../sockets/index.js'
+import { emitToUsers } from '../sockets/index.js'
 
 export async function loadProfile(userId) {
   const [alumni, student] = await Promise.all([
@@ -38,7 +38,7 @@ export const updateMyProfile = asyncHandler(async (req, res) => {
   }
 
   const bundle = await profileModel.getProfileBundle(userId)
-  getRealtime()?.toUser(userId).emit('profile:updated', { at: new Date().toISOString() })
+  await emitToUsers([userId], 'profile:updated', { at: new Date().toISOString() })
   sendSuccess(res, bundle, { message: 'Profile updated' })
 })
 

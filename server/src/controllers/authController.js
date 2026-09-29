@@ -49,7 +49,10 @@ export const resetPassword = asyncHandler(async (req, res) => {
 })
 
 export const verifyEmail = asyncHandler(async (req, res) => {
-  const result = await authService.verifyEmail(req.body.token, contextOf(req))
+  // The verification link is a GET, so the token arrives in the query string.
+  const result = await authService.verifyEmail(
+    req.query.token ?? req.body?.token, contextOf(req),
+  )
   sendSuccess(res, null, { message: result.message })
 })
 
