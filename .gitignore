@@ -38,4 +38,11 @@ Thumbs.db
 # Test output
 .nyc_output/
 playwright-report/
+
+# Local PGlite development database (server/scripts/dev-postgres.js)
+server/.dev-postgres/
+
+# Local file storage (resume uploads, generated artefacts)
+server/storage/
+server/uploads/
 test-results/
