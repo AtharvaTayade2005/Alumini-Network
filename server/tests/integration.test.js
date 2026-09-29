@@ -381,6 +381,34 @@ describe('profiles and directory', () => {
     assert.equal(after.body.data.length, 0)
   })
 
+  it('updates privacy settings from camelCase input and returns snake_case rows', async () => {
+    // The client sends camelCase (per privacySettingsSchema) but reads the
+    // snake_case database rows, so both halves of that contract are asserted.
+    const updated = await request(app)
+      .patch('/api/profiles/me/privacy')
+      .set(asAuth(token))
+      .send({ showEmail: false, showLocation: true, allowMessagesFrom: 'nobody' })
+    assert.equal(updated.status, 200, JSON.stringify(updated.body))
+
+    const row = updated.body.data
+    assert.equal(row.show_email, false, 'camelCase showEmail must map to show_email')
+    assert.equal(row.show_location, true)
+    assert.equal(row.allow_messages_from, 'nobody')
+    // Untouched flags must keep their existing value rather than reset.
+    // show_phone defaults to FALSE in the schema, so assert against that.
+    assert.equal(row.show_phone, false)
+
+    const reread = await request(app)
+      .get('/api/profiles/me/privacy').set(asAuth(token))
+    assert.equal(reread.body.data.show_email, false, 'the change must persist')
+
+    // Put it back so later tests in this file are unaffected.
+    await request(app)
+      .patch('/api/profiles/me/privacy')
+      .set(asAuth(token))
+      .send({ showEmail: true, showLocation: false, allowMessagesFrom: 'everyone' })
+  })
+
   it('hides another user contact details until they opt in', async () => {
     const other = await createUser({ email: `private.${uniq()}@example.edu` })
     await query('UPDATE privacy_settings SET show_email = FALSE WHERE user_id = $1',
