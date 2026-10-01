@@ -91,17 +91,18 @@ export default function Messages() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-900">Messages</h1>
-        <p className="mt-1 text-sm text-slate-600">
+      <header className="mb-4">
+        <p className="font-mono text-[10px] tracking-widest text-swiss-label uppercase mb-2">06 &mdash; MESSAGES</p>
+        <h1 className="text-3xl font-bold tracking-tight text-swiss-text">MESSAGES</h1>
+        <p className="mt-2 text-sm text-swiss-muted">
           Conversations with your connections.
         </p>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        <Card className="h-fit overflow-hidden">
-          <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">Conversations</h2>
+        <Card className={cx("h-fit overflow-hidden", peerId ? "hidden lg:block" : "block")}>
+          <div className="border-b border-swiss-border px-4 py-3">
+            <h2 className="text-sm font-semibold text-swiss-text">Conversations</h2>
           </div>
 
           {conversations.loading ? (
@@ -119,15 +120,15 @@ export default function Messages() {
               )}
             />
           ) : (
-            <ul className="max-h-[32rem] divide-y divide-slate-100 overflow-y-auto">
+            <ul className="max-h-[32rem] divide-y divide-swiss-border overflow-y-auto">
               {conversations.rows.map((row) => (
                 <li key={row.peerId}>
                   <button
                     type="button"
                     onClick={() => navigate(`/messages/${row.peerId}`)}
                     className={cx(
-                      'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50',
-                      row.peerId === peerId && 'bg-slate-100',
+                      'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-swiss-surface',
+                      row.peerId === peerId && 'bg-swiss-surface',
                     )}
                   >
                     <div className="relative">
@@ -141,13 +142,13 @@ export default function Messages() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
-                        <p className="truncate text-sm font-medium text-slate-900">{row.name}</p>
-                        <span className="shrink-0 text-xs text-slate-500">
+                         <p className="truncate text-sm font-medium text-swiss-text">{row.name}</p>
+                        <span className="shrink-0 text-xs text-swiss-label">
                           {relativeTime(row.lastMessageAt)}
                         </span>
                       </div>
                       <div className="mt-0.5 flex items-center gap-2">
-                        <p className="min-w-0 flex-1 truncate text-xs text-slate-600">
+                        <p className="min-w-0 flex-1 truncate text-xs text-swiss-muted">
                           {row.lastMessage ?? 'No messages yet'}
                         </p>
                         {row.unreadCount > 0 ? (
@@ -162,7 +163,7 @@ export default function Messages() {
           )}
         </Card>
 
-        <Card className="flex h-[32rem] flex-col overflow-hidden">
+        <Card className={cx("flex-col overflow-hidden h-[32rem]", peerId ? "flex" : "hidden lg:flex")}>
           {!peerId ? (
             <EmptyState
               title="Select a conversation"
@@ -170,13 +171,20 @@ export default function Messages() {
             />
           ) : (
             <>
-              <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-3">
+              <div className="flex items-center gap-3 border-b border-swiss-border px-5 py-3">
+                <button
+                  type="button"
+                  className="lg:hidden text-swiss-muted hover:text-swiss-text p-1"
+                  onClick={() => navigate('/messages')}
+                >
+                  &larr;
+                </button>
                 <Avatar name={active?.name} src={active?.avatarUrl} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-900">
+                  <p className="truncate text-sm font-semibold text-swiss-text">
                     {active?.name ?? 'Conversation'}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-swiss-label">
                     {active?.isOnline ? 'Online now' : 'Offline'}
                   </p>
                 </div>
@@ -185,13 +193,13 @@ export default function Messages() {
                 </Link>
               </div>
 
-              <div className="flex-1 overflow-y-auto bg-slate-50 px-5 py-4">
+              <div className="flex-1 overflow-y-auto bg-swiss-surface px-5 py-4">
                 {thread.loading ? (
                   <LoadingBlock rows={3} />
                 ) : thread.error ? (
                   <ErrorState error={thread.error} onRetry={() => loadThread(peerId)} />
                 ) : thread.rows.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-slate-500">
+                  <p className="py-8 text-center text-sm text-swiss-label">
                     No messages yet. Say hello.
                   </p>
                 ) : (
@@ -206,7 +214,7 @@ export default function Messages() {
                 )}
               </div>
 
-              <form onSubmit={send} className="border-t border-slate-200 p-4">
+              <form onSubmit={send} className="border-t border-swiss-border p-4">
                 {sendError ? (
                   <div className="mb-3">
                     <Alert tone="error">{sendError.message}</Alert>
@@ -230,7 +238,7 @@ export default function Messages() {
                     {sending ? <Spinner /> : 'Send'}
                   </Button>
                 </div>
-                <p className="mt-1.5 text-xs text-slate-500">Ctrl+Enter to send</p>
+                <p className="mt-1.5 text-xs text-swiss-label">Ctrl+Enter to send</p>
               </form>
             </>
           )}
@@ -242,12 +250,12 @@ export default function Messages() {
 
 function Bubble({ message, mine }) {
   return (
-    <div className={cx('max-w-[75%] rounded-lg px-3.5 py-2 shadow-sm', mine
+    <div className={cx('max-w-[75%] rounded-sm px-3.5 py-2 border border-swiss-border', mine
       ? 'ml-auto bg-slate-900 text-white'
-      : 'bg-white text-slate-900')}
+      : 'bg-swiss-surface text-swiss-text')}
     >
       <p className="whitespace-pre-wrap break-words text-sm">{message.body}</p>
-      <p className={cx('mt-1 text-[11px]', mine ? 'text-slate-300' : 'text-slate-500')}>
+      <p className={cx('mt-1 text-[11px]', mine ? 'text-swiss-border' : 'text-swiss-label')}>
         {clockTime(message.createdAt)}
         {mine && message.isRead ? ' · Read' : ''}
       </p>

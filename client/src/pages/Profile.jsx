@@ -104,9 +104,10 @@ export default function Profile() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-900">Your profile</h1>
-        <p className="mt-1 text-sm text-slate-600">
+      <header className="mb-4">
+        <p className="font-mono text-[10px] tracking-widest text-swiss-label uppercase mb-2">08 &mdash; PROFILE</p>
+        <h1 className="text-3xl font-bold tracking-tight text-swiss-text">YOUR PROFILE</h1>
+        <p className="mt-2 text-sm text-swiss-muted">
           This is what other members see in the directory.
         </p>
       </header>
@@ -197,7 +198,7 @@ export default function Profile() {
           <Button type="submit" size="lg" disabled={state.saving}>
             {state.saving ? <><Spinner className="border-white/40 border-t-white" /> Saving</> : 'Save changes'}
           </Button>
-          <span className="text-sm text-slate-500">Signed in as {form._email}</span>
+          <span className="text-sm text-swiss-label">Signed in as {form._email}</span>
         </div>
       </form>
 
@@ -252,12 +253,12 @@ function SignInMethodsPanel() {
         description="Connect a provider to sign in without your password."
       />
       {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
-      <ul className="mt-4 divide-y divide-slate-200">
+      <ul className="mt-4 divide-y divide-swiss-border">
         {state.providers.map((provider) => {
           const connected = linked.has(provider.provider)
           return (
             <li key={provider.provider} className="flex items-center justify-between py-3">
-              <span className="text-sm text-slate-800">{provider.label}</span>
+              <span className="text-sm text-swiss-text">{provider.label}</span>
               {connected ? (
                 <Button
                   variant="ghost"

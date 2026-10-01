@@ -91,8 +91,9 @@ export default function Directory() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-900">Alumni directory</h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="font-mono text-[10px] tracking-widest text-swiss-label uppercase mb-2">02 &mdash; DIRECTORY</p>
+        <h1 className="text-3xl font-bold tracking-tight text-swiss-text">ALUMNI DIRECTORY</h1>
+        <p className="mt-2 text-sm text-swiss-muted">
           Search across the network by name, company, skill, or location.
         </p>
       </header>
@@ -101,9 +102,9 @@ export default function Directory() {
         <Card className="h-fit">
           <form onSubmit={onSubmit} className="space-y-4 p-5">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Filters</h2>
+              <h2 className="text-sm font-semibold text-swiss-text">Filters</h2>
               {activeCount > 0 ? (
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-xs text-swiss-label">
                   {activeCount} active
                 </p>
               ) : null}
@@ -182,11 +183,11 @@ export default function Directory() {
         </Card>
 
         <Card className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-            <p className="text-sm text-slate-600">
+          <div className="flex items-center justify-between border-b border-swiss-border px-5 py-3">
+            <p className="text-sm text-swiss-muted">
               {state.loading ? 'Searching' : (
                 <>
-                  <span className="font-semibold text-slate-900">{result.meta?.total ?? 0}</span>{' '}
+                  <span className="font-semibold text-swiss-text">{result.meta?.total ?? 0}</span>{' '}
                   member{result.meta?.total === 1 ? '' : 's'} found
                 </>
               )}
@@ -207,7 +208,7 @@ export default function Directory() {
 
           {!state.error && !state.loading && result.rows.length > 0 ? (
             <>
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-swiss-border">
                 {result.rows.map((person) => (
                   <li key={person.id} className="px-5 py-4">
                     <div className="flex flex-wrap items-start gap-4">
@@ -216,7 +217,7 @@ export default function Directory() {
                         <div className="flex flex-wrap items-center gap-2">
                           <Link
                             to={`/alumni/${person.id}`}
-                            className="font-medium text-slate-900 underline-offset-2 hover:underline"
+                            className="font-medium text-swiss-text underline-offset-2 hover:underline"
                           >
                             {person.name}
                           </Link>
@@ -225,11 +226,11 @@ export default function Directory() {
                             <Badge tone="blue">Open to mentor</Badge>
                           ) : null}
                         </div>
-                        <p className="mt-0.5 text-sm text-slate-600">
+                        <p className="mt-0.5 text-sm text-swiss-muted">
                           {[person.currentPosition, person.currentCompany]
                             .filter(Boolean).join(' at ') || 'No role listed'}
                         </p>
-                        <p className="mt-0.5 text-xs text-slate-500">
+                        <p className="mt-0.5 text-xs text-swiss-label">
                           {[
                             person.degree,
                             person.graduationYear ? `Class of ${person.graduationYear}` : null,

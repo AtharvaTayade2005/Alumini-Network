@@ -64,14 +64,15 @@ export default function Login() {
   }
 
   return (
-    <div className="mx-auto max-w-md">
-      <Card className="p-6">
-        <h1 className="text-xl font-semibold text-slate-900">Sign in</h1>
-        <p className="mt-1 text-sm text-slate-600">
+    <div className="mx-auto max-w-md py-12">
+      <Card className="p-8">
+        <p className="font-mono text-[10px] tracking-widest text-swiss-label uppercase mb-2">AUTH &mdash; 01</p>
+        <h1 className="text-2xl font-bold tracking-tight text-swiss-text">SIGN IN</h1>
+        <p className="mt-2 text-sm text-swiss-muted leading-relaxed">
           Welcome back. Sign in to reach your network.
         </p>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
+        <form onSubmit={onSubmit} className="mt-8 space-y-5" noValidate>
           <FieldErrorSummary error={error} />
 
           <Field label="Email address" required>
@@ -103,19 +104,19 @@ export default function Login() {
             <Alert tone="error">{error.message}</Alert>
           ) : null}
 
-          <Button type="submit" size="lg" className="w-full" disabled={submitting}>
-            {submitting ? <><Spinner className="border-white/40 border-t-white" /> Signing in</> : 'Sign in'}
+          <Button type="submit" size="lg" className="w-full mt-2" disabled={submitting}>
+            {submitting ? <><Spinner className="border-white/40 border-t-white" /> SIGNING IN...</> : 'SIGN IN &rarr;'}
           </Button>
         </form>
 
         {providers.length ? (
-          <div className="mt-6">
-            <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-slate-500">
-              <span className="h-px flex-1 bg-slate-200" />
+          <div className="mt-8">
+            <div className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-widest text-swiss-label">
+              <span className="h-px flex-1 bg-swiss-border" />
               or continue with
-              <span className="h-px flex-1 bg-slate-200" />
+              <span className="h-px flex-1 bg-swiss-border" />
             </div>
-            <div className="mt-4 grid gap-2">
+            <div className="mt-5 grid gap-3">
               {providers.map((provider) => (
                 <Button
                   key={provider.provider}
@@ -132,19 +133,21 @@ export default function Login() {
                 </Button>
               ))}
             </div>
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="mt-4 text-xs text-swiss-label">
               Provider sign-in only works for an existing account. Set a password once to
               connect {providers.length === 1 ? 'this provider' : 'a provider'}.
             </p>
           </div>
         ) : null}
 
-        <p className="mt-5 text-sm text-slate-600">
-          No account yet?{' '}
-          <Link to="/register" className="font-medium text-slate-900 underline underline-offset-2">
-            Create one
-          </Link>
-        </p>
+        <div className="mt-8 border-t border-swiss-border pt-6">
+          <p className="text-sm text-swiss-muted">
+            No account yet?{' '}
+            <Link to="/register" className="font-mono text-[10px] tracking-widest text-swiss-label uppercase hover:text-swiss-text">
+              CREATE ONE &rarr;
+            </Link>
+          </p>
+        </div>
       </Card>
     </div>
   )

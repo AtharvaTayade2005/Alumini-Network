@@ -105,10 +105,11 @@ export default function Notifications() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Notifications</h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="font-mono text-[10px] tracking-widest text-swiss-label uppercase mb-2">07 &mdash; NOTIFICATIONS</p>
+          <h1 className="text-3xl font-bold tracking-tight text-swiss-text">NOTIFICATIONS</h1>
+          <p className="mt-2 text-sm text-swiss-muted">
             {hasUnread
               ? `${state.unread} unread notification${state.unread === 1 ? '' : 's'}`
               : 'You are all caught up.'}
@@ -129,7 +130,7 @@ export default function Notifications() {
               'rounded-full px-3 py-1 text-xs font-medium transition-colors',
               filter === value
                 ? 'bg-slate-900 text-white'
-                : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50',
+                : 'bg-swiss-surface text-swiss-muted ring-1 ring-swiss-border hover:bg-swiss-surface',
             )}
           >
             {label}
@@ -150,29 +151,29 @@ export default function Notifications() {
               : 'Try a different filter.'}
           />
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-swiss-border">
             {visible.map((row) => (
               <li
                 key={row.id}
-                className={cx('flex items-start gap-3 px-5 py-4', !row.is_read && 'bg-blue-50/40')}
+                className={cx('flex items-start gap-3 px-5 py-4 transition-colors', !row.is_read && 'bg-[var(--color-swiss-surface-hover)]')}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     {!row.is_read ? (
                       <span
-                        className="h-2 w-2 shrink-0 rounded-full bg-blue-600"
+                        className="h-2 w-2 shrink-0 rounded-full bg-swiss-text"
                         title="Unread"
                       />
                     ) : null}
-                    <p className="text-sm font-medium text-slate-900">{row.title}</p>
+                    <p className="text-sm font-medium text-swiss-text">{row.title}</p>
                     <Badge tone={TONES[row.type] ?? 'slate'}>
                       {row.type.replace(/_/g, ' ')}
                     </Badge>
                   </div>
                   {row.body ? (
-                    <p className="mt-1 text-sm text-slate-600">{row.body}</p>
+                    <p className="mt-1 text-sm text-swiss-muted">{row.body}</p>
                   ) : null}
-                  <p className="mt-1 text-xs text-slate-500">{timeAgo(row.created_at)}</p>
+                  <p className="mt-1 text-xs text-swiss-label">{timeAgo(row.created_at)}</p>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1">

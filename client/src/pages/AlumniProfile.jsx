@@ -78,10 +78,15 @@ export default function AlumniProfile() {
       <button
         type="button"
         onClick={() => navigate(-1)}
-        className="text-sm text-slate-600 hover:text-slate-900"
+        className="text-sm font-mono tracking-widest text-swiss-muted hover:text-swiss-text uppercase mb-2"
       >
         &larr; Back
       </button>
+
+      <header className="mb-4">
+        <p className="font-mono text-[10px] tracking-widest text-swiss-label uppercase mb-2">08 &mdash; ALUMNI PROFILE</p>
+        <h1 className="text-3xl font-bold tracking-tight text-swiss-text">IDENTITY</h1>
+      </header>
 
       {actionError ? <Alert tone="error">{actionError.message}</Alert> : null}
       {message ? <Alert tone="success" onDismiss={() => setMessage('')}>{message}</Alert> : null}
@@ -92,7 +97,7 @@ export default function AlumniProfile() {
             <Avatar name={profile?.user?.name} src={profile?.user?.avatarUrl} size="lg" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold text-slate-900">
+                <h1 className="text-xl font-semibold text-swiss-text">
                   {profile?.user?.name}
                 </h1>
                 {profile?.user?.isEmailVerified ? (
@@ -102,11 +107,11 @@ export default function AlumniProfile() {
                   <Badge tone="green">Alumni verified</Badge>
                 ) : null}
               </div>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-1 text-sm text-swiss-muted">
                 {[role?.current_position, role?.current_company]
                   .filter(Boolean).join(' at ') || 'No role listed'}
               </p>
-              <p className="mt-0.5 text-sm text-slate-500">
+              <p className="mt-0.5 text-sm text-swiss-label">
                 {[
                   role?.degree,
                   role?.graduation_year ? `Class of ${role.graduation_year}` : null,
@@ -196,8 +201,8 @@ export default function AlumniProfile() {
           </div>
 
           {showNote && connectionState === 'none' ? (
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <label className="mb-1.5 block text-sm font-medium text-slate-800">
+            <div className="mt-4 rounded-sm border border-swiss-border bg-swiss-surface p-4">
+              <label className="mb-1.5 block text-sm font-medium text-swiss-text">
                 Add a note (optional)
               </label>
               <Textarea
@@ -228,8 +233,8 @@ export default function AlumniProfile() {
         <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader title="About" />
-            <div className="px-5 py-4 text-sm text-slate-700">
-              {role?.bio || <span className="text-slate-400">No bio provided.</span>}
+            <div className="px-5 py-4 text-sm text-swiss-muted">
+              {role?.bio || <span className="text-swiss-label">No bio provided.</span>}
             </div>
           </Card>
 
@@ -249,14 +254,14 @@ export default function AlumniProfile() {
           <Card>
             <CardHeader title="Education" />
             {profile?.education?.length ? (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-swiss-border">
                 {profile.education.map((entry) => (
                   <li key={entry.id} className="px-5 py-3">
-                    <p className="text-sm font-medium text-slate-900">{entry.institution}</p>
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm font-medium text-swiss-text">{entry.institution}</p>
+                    <p className="text-sm text-swiss-muted">
                       {[entry.degree, entry.field_of_study].filter(Boolean).join(', ')}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-swiss-label">
                       {[entry.start_year, entry.end_year].filter(Boolean).join(' - ')}
                     </p>
                   </li>
@@ -270,12 +275,12 @@ export default function AlumniProfile() {
           <Card>
             <CardHeader title="Experience" />
             {profile?.experience?.length ? (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-swiss-border">
                 {profile.experience.map((entry) => (
                   <li key={entry.id} className="px-5 py-3">
-                    <p className="text-sm font-medium text-slate-900">{entry.position_title}</p>
-                    <p className="text-sm text-slate-600">{entry.company_name}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-sm font-medium text-swiss-text">{entry.position_title}</p>
+                    <p className="text-sm text-swiss-muted">{entry.company_name}</p>
+                    <p className="text-xs text-swiss-label">
                       {[
                         entry.start_date ? new Date(entry.start_date).getFullYear() : null,
                         entry.is_current ? 'Present' : entry.end_date
@@ -309,14 +314,14 @@ export default function AlumniProfile() {
           {profile?.socialLinks?.length ? (
             <Card>
               <CardHeader title="Links" />
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-swiss-border">
                 {profile.socialLinks.map((link) => (
                   <li key={link.id} className="px-5 py-2.5">
                     <a
                       href={link.url}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="text-sm text-slate-900 underline underline-offset-2"
+                      className="text-sm text-swiss-text underline underline-offset-2"
                     >
                       {link.platform}
                     </a>
@@ -334,9 +339,9 @@ export default function AlumniProfile() {
 function Detail({ label, value, privateHint }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-slate-900">
-        {value || <span className="text-slate-400">{privateHint ?? 'Not provided'}</span>}
+      <dt className="text-xs font-medium uppercase tracking-wide text-swiss-label">{label}</dt>
+      <dd className="mt-0.5 text-swiss-text">
+        {value || <span className="text-swiss-label">{privateHint ?? 'Not provided'}</span>}
       </dd>
     </div>
   )

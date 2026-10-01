@@ -16,9 +16,9 @@ import {
 const STACK = 'flex flex-col gap-6'
 const ROW = 'flex flex-wrap items-center gap-2'
 const GRID = 'grid gap-4 md:grid-cols-2'
-const MUTED = 'text-sm text-slate-600'
-const MUTED_SMALL = 'text-xs text-slate-500'
-const FLUSH = 'rounded-xl border border-slate-200 bg-white p-5 shadow-sm'
+const MUTED = 'text-sm text-swiss-muted'
+const MUTED_SMALL = 'text-xs text-swiss-label'
+const FLUSH = 'rounded-sm border border-swiss-border bg-swiss-surface p-5 border border-swiss-border'
 
 const TABS = [
   ['find', 'Find a mentor'],
@@ -45,10 +45,10 @@ const STATUS_TONES = {
 
 function tabClass(isActive) {
   return cx(
-    'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+    'inline-flex items-center gap-2 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors',
     isActive
       ? 'bg-slate-900 text-white'
-      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+      : 'text-swiss-muted hover:bg-swiss-surface hover:text-swiss-text',
   )
 }
 
@@ -65,11 +65,11 @@ function PersonHeading({ peer, caption, to }) {
       <Avatar name={peer?.name} src={peer?.avatarUrl} />
       <div className="min-w-0">
         {to ? (
-          <Link to={to} className="block truncate font-semibold text-slate-900 hover:underline">
+          <Link to={to} className="block truncate font-semibold text-swiss-text hover:underline">
             {peer?.name ?? 'Member'}
           </Link>
         ) : (
-          <span className="block truncate font-semibold text-slate-900">
+          <span className="block truncate font-semibold text-swiss-text">
             {peer?.name ?? 'Member'}
           </span>
         )}
@@ -84,8 +84,8 @@ function DetailList({ items }) {
     <dl className="grid gap-1 text-sm sm:grid-cols-[8rem_1fr] sm:gap-x-3">
       {items.filter(Boolean).map(([term, value]) => (
         <div key={term} className="contents">
-          <dt className="font-medium text-slate-700">{term}</dt>
-          <dd className="text-slate-600">{value}</dd>
+          <dt className="font-medium text-swiss-muted">{term}</dt>
+          <dd className="text-swiss-muted">{value}</dd>
         </div>
       ))}
     </dl>
@@ -225,7 +225,7 @@ function RequestCard({ request, onRespond, onCancel, busy }) {
       ]} />
 
       {request.message ? (
-        <p className="mt-3 border-l-2 border-slate-200 pl-3 text-sm italic text-slate-600">
+        <p className="mt-3 border-l-2 border-swiss-border pl-3 text-sm italic text-swiss-muted">
           {request.message}
         </p>
       ) : null}
@@ -365,10 +365,13 @@ export default function Mentorship() {
 
   return (
     <div className={STACK}>
-      <CardHeader
-        title="Mentorship"
-        description="Find an experienced alum, or help someone take their next step."
-      />
+      <header className="mb-4">
+        <p className="font-mono text-[10px] tracking-widest text-swiss-label uppercase mb-2">04 &mdash; MENTORSHIP</p>
+        <h1 className="text-3xl font-bold tracking-tight text-swiss-text">MENTORSHIP</h1>
+        <p className="mt-2 text-sm text-swiss-muted">
+          Find an experienced alum, or help someone take their next step.
+        </p>
+      </header>
 
       {notice ? (
         <Alert tone={notice.tone} onDismiss={() => setNotice(null)}>{notice.text}</Alert>

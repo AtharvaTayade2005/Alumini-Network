@@ -16,14 +16,14 @@ import {
 const STACK = 'flex flex-col gap-6'
 const ROW = 'flex flex-wrap items-center gap-2'
 const GRID = 'grid gap-4 md:grid-cols-2'
-const MUTED = 'text-sm text-slate-600'
-const MUTED_SMALL = 'text-xs text-slate-500'
-const FLUSH = 'rounded-xl border border-slate-200 bg-white p-5 shadow-sm'
-const PROSE = 'whitespace-pre-line text-sm leading-relaxed text-slate-700'
+const MUTED = 'text-sm text-swiss-muted'
+const MUTED_SMALL = 'text-xs text-swiss-label'
+const FLUSH = 'rounded-sm border border-swiss-border bg-swiss-surface p-5 border border-swiss-border'
+const PROSE = 'whitespace-pre-line text-sm leading-relaxed text-swiss-muted'
 
 /** Matches the Button ghost variant so links can be styled as buttons. */
-const LINK_BUTTON = 'inline-flex items-center justify-center rounded-md px-3.5 py-2 '
-  + 'text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100'
+const LINK_BUTTON = 'inline-flex items-center justify-center rounded-sm px-3.5 py-2 '
+  + 'text-sm font-medium text-swiss-muted transition-colors hover:bg-swiss-surface'
 
 const WORK_MODES = [['remote', 'Remote'], ['hybrid', 'Hybrid'], ['onsite', 'On site']]
 const EMPLOYMENT_TYPES = [
@@ -76,9 +76,9 @@ function deadlineLabel(job) {
 
 function MetaList({ items }) {
   return (
-    <ul className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+    <ul className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-swiss-label">
       {items.filter(Boolean).map((item) => (
-        <li key={item} className="after:ml-2 after:text-slate-300 last:after:content-['']">
+        <li key={item} className="after:ml-2 after:text-swiss-border last:after:content-['']">
           {item}
         </li>
       ))}
@@ -94,7 +94,7 @@ function JobCard({ job, onSave, busy }) {
         <div className="min-w-0">
           <Link
             to={`/jobs/${job.id}`}
-            className="block truncate font-semibold text-slate-900 hover:underline"
+            className="block truncate font-semibold text-swiss-text hover:underline"
           >
             {job.title}
           </Link>
@@ -112,7 +112,7 @@ function JobCard({ job, onSave, busy }) {
         label(LEVELS, job.experienceLevel),
       ]} />
 
-      <p className="mt-2 text-sm font-medium text-slate-800">{formatSalary(job)}</p>
+      <p className="mt-2 text-sm font-medium text-swiss-text">{formatSalary(job)}</p>
 
       {job.skills?.length ? (
         <ul className="mt-2 flex flex-wrap gap-1.5">
@@ -229,7 +229,7 @@ function JobDetail({ jobId, onBack }) {
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-slate-900">{job.title}</h2>
+            <h2 className="text-lg font-semibold text-swiss-text">{job.title}</h2>
             <p className={MUTED}>
               {job.companyName}
               {job.companyId ? (
@@ -283,7 +283,7 @@ function JobDetail({ jobId, onBack }) {
       </Card>
 
       <Card>
-        <h3 className="mb-2 text-base font-semibold text-slate-900">About this role</h3>
+        <h3 className="mb-2 text-base font-semibold text-swiss-text">About this role</h3>
         <p className={PROSE}>{job.description}</p>
       </Card>
 
@@ -293,7 +293,7 @@ function JobDetail({ jobId, onBack }) {
         </Alert>
       ) : applying ? (
         <Card>
-          <h3 className="mb-3 text-base font-semibold text-slate-900">Apply to {job.title}</h3>
+          <h3 className="mb-3 text-base font-semibold text-swiss-text">Apply to {job.title}</h3>
           <ApplyPanel job={job} onDone={() => { setApplying(false); load() }} />
         </Card>
       ) : job.status === 'active' ? (
@@ -335,13 +335,13 @@ function CompanyDetail({ companyId, onBack }) {
     <div className={STACK}>
       <Button variant="ghost" onClick={onBack}>Back to all jobs</Button>
       <Card>
-        <h2 className="text-lg font-semibold text-slate-900">{data.company.name}</h2>
+        <h2 className="text-lg font-semibold text-swiss-text">{data.company.name}</h2>
         <p className={MUTED}>
           {[data.company.industry, data.company.location].filter(Boolean).join(' · ')}
         </p>
         {data.company.website ? (
           <a
-            className="text-sm text-slate-700 underline"
+            className="text-sm text-swiss-muted underline"
             href={data.company.website}
             target="_blank"
             rel="noreferrer noopener"
@@ -406,7 +406,7 @@ function MyApplications() {
             <div className="min-w-0">
               <Link
                 to={`/jobs/${application.jobId}`}
-                className="block truncate font-semibold text-slate-900 hover:underline"
+                className="block truncate font-semibold text-swiss-text hover:underline"
               >
                 {application.jobTitle}
               </Link>
@@ -601,7 +601,7 @@ function PostJobReview({ jobId, onBack }) {
         <article key={application.id} className={FLUSH}>
           <div className="mb-2 flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <span className="block truncate font-semibold text-slate-900">
+              <span className="block truncate font-semibold text-swiss-text">
                 {application.applicant?.name}
               </span>
               <p className={cx('truncate', MUTED_SMALL)}>
@@ -613,7 +613,7 @@ function PostJobReview({ jobId, onBack }) {
             </Badge>
           </div>
           {application.coverLetter ? (
-            <p className={cx('border-l-2 border-slate-200 pl-3 text-sm text-slate-600', PROSE)}>
+            <p className={cx('border-l-2 border-swiss-border pl-3 text-sm text-swiss-muted', PROSE)}>
               {application.coverLetter}
             </p>
           ) : null}
@@ -654,10 +654,10 @@ const POSTING_ROLES = ['ALUMNI', 'MODERATOR', 'ADMIN']
 
 function tabClass(isActive) {
   return cx(
-    'inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+    'inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-medium transition-colors',
     isActive
       ? 'bg-slate-900 text-white'
-      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+      : 'text-swiss-muted hover:bg-swiss-surface hover:text-swiss-text',
   )
 }
 
@@ -758,7 +758,13 @@ export default function Jobs({ view: routeView = 'board' }) {
 
   return (
     <div className={STACK}>
-      <CardHeader title="Jobs" description="Roles shared by alumni and staff across the network." />
+      <header className="mb-4">
+        <p className="font-mono text-[10px] tracking-widest text-swiss-label uppercase mb-2">05 &mdash; JOBS</p>
+        <h1 className="text-3xl font-bold tracking-tight text-swiss-text">JOBS</h1>
+        <p className="mt-2 text-sm text-swiss-muted">
+          Roles shared by alumni and staff across the network.
+        </p>
+      </header>
 
       {notice ? <Alert tone="error" onDismiss={() => setNotice(null)}>{notice.text}</Alert> : null}
 
@@ -923,7 +929,7 @@ export default function Jobs({ view: routeView = 'board' }) {
                 <div className="min-w-0">
                   <Link
                     to={`/jobs/${job.id}`}
-                    className="block truncate font-semibold text-slate-900 hover:underline"
+                    className="block truncate font-semibold text-swiss-text hover:underline"
                   >
                     {job.title}
                   </Link>

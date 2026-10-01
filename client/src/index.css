@@ -1,1 +1,24 @@
 @import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  --color-swiss-base: #ffffff;
+  --color-swiss-surface: #f7f7f7;
+  --color-swiss-surface-hover: #eeeeee;
+  --color-swiss-surface-alt: #f0f0f0;
+  --color-swiss-border: #e5e5e5;
+  --color-swiss-border-hover: #cccccc;
+  --color-swiss-text: #111111;
+  --color-swiss-muted: #666666;
+  --color-swiss-label: #999999;
+  --color-swiss-accent: #ff6600; /* Vibrant Orange */
+}
+
+@layer base {
+  html {
+    background-color: var(--color-swiss-base);
+    color: var(--color-swiss-text);
+  }
+}

@@ -81,17 +81,18 @@ export default function Register() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <Card className="p-6">
-        <h1 className="text-xl font-semibold text-slate-900">Create your account</h1>
-        <p className="mt-1 text-sm text-slate-600">
+    <div className="mx-auto max-w-2xl py-12">
+      <Card className="p-8">
+        <p className="font-mono text-[10px] tracking-widest text-swiss-label uppercase mb-2">AUTH &mdash; 02</p>
+        <h1 className="text-2xl font-bold tracking-tight text-swiss-text">CREATE YOUR ACCOUNT</h1>
+        <p className="mt-2 text-sm text-swiss-muted leading-relaxed">
           Join the alumni network to find people, share opportunities, and stay connected.
         </p>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-5" noValidate>
+        <form onSubmit={onSubmit} className="mt-8 space-y-6" noValidate>
           <FieldErrorSummary error={error} />
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2">
             <Field label="First name" required>
               <Input
                 required
@@ -139,7 +140,7 @@ export default function Register() {
             />
           </Field>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2 border-t border-swiss-border pt-6 mt-2">
             <Field label="I am a" required>
               <Select value={form.role} onChange={onRoleChange}>
                 <option value="ALUMNI">Alumni</option>
@@ -177,7 +178,7 @@ export default function Register() {
             )}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2">
             <Field label="Degree" hint="Optional">
               <Input value={form.degree} onChange={update('degree')} placeholder="BSc Computer Science" />
             </Field>
@@ -186,32 +187,36 @@ export default function Register() {
             </Field>
           </div>
 
-          <Checkbox
-            label="I accept the terms of use and privacy policy"
-            checked={form.acceptTerms}
-            onChange={update('acceptTerms')}
-          />
-          {error?.fields?.acceptTerms ? (
-            <p className="-mt-2 text-xs font-medium text-red-600">
-              {error.fields.acceptTerms}
-            </p>
-          ) : null}
+          <div className="border-t border-swiss-border pt-6">
+            <Checkbox
+              label="I accept the terms of use and privacy policy"
+              checked={form.acceptTerms}
+              onChange={update('acceptTerms')}
+            />
+            {error?.fields?.acceptTerms ? (
+              <p className="mt-2 text-xs font-mono text-red-500">
+                {error.fields.acceptTerms}
+              </p>
+            ) : null}
+          </div>
 
           {error && !Object.keys(error.fields ?? {}).length ? (
             <Alert tone="error">{error.message}</Alert>
           ) : null}
 
-          <Button type="submit" size="lg" className="w-full" disabled={submitting}>
-            {submitting ? <><Spinner className="border-white/40 border-t-white" /> Creating account</> : 'Create account'}
+          <Button type="submit" size="lg" className="w-full mt-2" disabled={submitting}>
+            {submitting ? <><Spinner className="border-white/40 border-t-white" /> CREATING ACCOUNT...</> : 'CREATE ACCOUNT &rarr;'}
           </Button>
         </form>
 
-        <p className="mt-5 text-sm text-slate-600">
-          Already registered?{' '}
-          <Link to="/login" className="font-medium text-slate-900 underline underline-offset-2">
-            Sign in
-          </Link>
-        </p>
+        <div className="mt-8 border-t border-swiss-border pt-6">
+          <p className="text-sm text-swiss-muted">
+            Already registered?{' '}
+            <Link to="/login" className="font-mono text-[10px] tracking-widest text-swiss-label uppercase hover:text-swiss-text">
+              SIGN IN &rarr;
+            </Link>
+          </p>
+        </div>
       </Card>
     </div>
   )
