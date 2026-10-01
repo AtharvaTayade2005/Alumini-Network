@@ -9,8 +9,16 @@ import Messages from '../pages/Messages.jsx'
 import Notifications from '../pages/Notifications.jsx'
 import Jobs from '../pages/Jobs.jsx'
 import Events from '../pages/Events.jsx'
+import EventDetails from '../pages/EventDetails.jsx'
 import Mentorship from '../pages/Mentorship.jsx'
 import Admin from '../pages/Admin.jsx'
+import Settings from '../pages/Settings.jsx'
+import Assistant from '../pages/Assistant.jsx'
+import ResumeAnalyzer from '../pages/ResumeAnalyzer.jsx'
+import JobReadiness from '../pages/JobReadiness.jsx'
+import SemanticSearch from '../pages/SemanticSearch.jsx'
+import NotFound from '../pages/NotFound.jsx'
+import { Forbidden, Unauthorized, ServerError, Offline, Maintenance } from '../pages/SystemScreens.jsx'
 import { RequireAnonymous, RequireAuth, RequireStaff } from './guards.jsx'
 
 const auth = (element) => <RequireAuth>{element}</RequireAuth>
@@ -34,8 +42,20 @@ const routes = [
   { path: '/jobs/applications', element: auth(<Jobs view="applications" />) },
   { path: '/jobs/:id', element: auth(<Jobs view="job" />) },
   { path: '/events', element: auth(<Events />) },
+  { path: '/events/:id', element: auth(<EventDetails />) },
   { path: '/mentorship', element: auth(<Mentorship />) },
+  { path: '/settings', element: auth(<Settings />) },
+  { path: '/assistant', element: auth(<Assistant />) },
+  { path: '/resume-analyzer', element: auth(<ResumeAnalyzer />) },
+  { path: '/job-readiness', element: auth(<JobReadiness />) },
+  { path: '/semantic-search', element: auth(<SemanticSearch />) },
   { path: '/admin', element: auth(<RequireStaff><Admin /></RequireStaff>) },
+  { path: '/403', element: <Forbidden /> },
+  { path: '/401', element: <Unauthorized /> },
+  { path: '/500', element: <ServerError /> },
+  { path: '/offline', element: <Offline /> },
+  { path: '/maintenance', element: <Maintenance /> },
+  { path: '*', element: <NotFound /> },
 ]
 
 export default routes
