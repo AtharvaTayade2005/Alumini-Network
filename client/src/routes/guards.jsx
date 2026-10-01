@@ -1,12 +1,13 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { canAccessRoute } from '../utils/permissions.js'
 import { Spinner } from '../components/ui.jsx'
 
 function FullPageSpinner() {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center" role="status">
-      <span className="flex items-center gap-2 text-sm text-slate-600">
-        <Spinner /> Checking your session
+    <div className="flex min-h-[50vh] items-center justify-center font-mono text-xs uppercase text-swiss-label" role="status">
+      <span className="flex items-center gap-2">
+        <Spinner /> Checking session credentials
       </span>
     </div>
   )
@@ -32,24 +33,31 @@ export function RequireAnonymous({ children }) {
   return children
 }
 
-/** Requires an admin or moderator role. */
-export function RequireStaff({ children }) {
-  const { isAuthenticated, isLoading, isStaff } = useAuth()
+/** Checks route permission based on role. Redirects to /403 if unauthorized. */
+export function RequireRoleAccess({ children }) {
+  const { user, isLoading } = useAuth()
   const location = useLocation()
 
   if (isLoading) return <FullPageSpinner />
-  if (!isAuthenticated) {
+  if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
+
+  if (!canAccessRoute(user, location.pathname)) {
+    return <Navigate to="/403" replace state={{ attempted: location.pathname }} />
+  }
+
+  return children
+}
+
+/** Legacy helper for admin/staff routes */
+export function RequireStaff({ children }) {
+  const { isStaff, isLoading } = useAuth()
+  const location = useLocation()
+
+  if (isLoading) return <FullPageSpinner />
   if (!isStaff) {
-    return (
-      <section className="rounded-xl border border-amber-200 bg-amber-50 p-6">
-        <h2 className="text-lg font-semibold text-amber-900">Not permitted</h2>
-        <p className="mt-1 text-sm text-amber-800">
-          This area is restricted to administrators and moderators.
-        </p>
-      </section>
-    )
+    return <Navigate to="/403" replace state={{ attempted: location.pathname }} />
   }
   return children
 }

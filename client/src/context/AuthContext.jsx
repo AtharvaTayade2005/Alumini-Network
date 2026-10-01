@@ -2,133 +2,107 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useState,
 } from 'react'
 import { auth as authApi, notifications } from '../services/api.js'
-import { api, tokenStore } from '../services/http.js'
+import { getUserPrimaryRole } from '../utils/permissions.js'
+import { ROLES } from '../utils/roles.js'
 
 const AuthContext = createContext(null)
 
-/** Roles that may reach the admin area. */
-const STAFF_ROLES = ['ADMIN', 'MODERATOR']
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  // "loading" until the initial session probe settles, so protected routes do
-  // not bounce an authenticated user to /login on a hard refresh.
   const [status, setStatus] = useState('loading')
   const [sessionError, setSessionError] = useState(null)
   const [unreadCount, setUnreadCount] = useState(0)
 
-  const applySession = useCallback((data) => {
-    if (data?.accessToken) tokenStore.set(data.accessToken)
-    setUser(data.user ?? null)
-    setStatus('authenticated')
+  const loadSession = useCallback(async () => {
+    try {
+      const res = await authApi.getSession()
+      setUser(res.data)
+      setStatus('authenticated')
+    } catch (err) {
+      setSessionError(err)
+      setStatus('anonymous')
+    }
   }, [])
 
-  const clearSession = useCallback(() => {
-    tokenStore.clear()
-    setUser(null)
-    setUnreadCount(0)
-    setStatus('anonymous')
-  }, [])
-
-  // Feed the header badge. Failures are ignored: a missing badge is not worth
-  // surfacing an error for.
   const loadUnread = useCallback(async () => {
     try {
-      const { meta } = await notifications.list({ limit: 1, unreadOnly: true })
-      setUnreadCount(meta?.unread ?? 0)
+      const res = await notifications.unreadCount()
+      setUnreadCount(res.data?.count ?? 0)
     } catch {
       setUnreadCount(0)
     }
   }, [])
 
-  // On mount: is there a refresh cookie we can exchange for a session?
   useEffect(() => {
-    let cancelled = false
+    loadSession()
+  }, [loadSession])
 
-    async function restore() {
-      try {
-        const me = await authApi.me()
-        if (cancelled) return
-        setUser(me.data)
-        setStatus('authenticated')
-        return
-      } catch {
-        // No access token yet - try to mint one from the refresh cookie.
-      }
-
-      try {
-        const token = await api.refresh()
-        if (cancelled || !token) {
-          if (!cancelled) setStatus('anonymous')
-          return
-        }
-        const me = await authApi.me()
-        if (cancelled) return
-        setUser(me.data)
-        setStatus('authenticated')
-      } catch (error) {
-        if (cancelled) return
-        setSessionError(error)
-        setStatus('anonymous')
-      }
+  useEffect(() => {
+    if (status === 'authenticated' && user) {
+      loadUnread()
+      const timer = setInterval(loadUnread, 15000)
+      return () => clearInterval(timer)
     }
+  }, [status, user, loadUnread])
 
-    restore()
-    return () => { cancelled = true }
-  }, [])
-
-  useEffect(() => {
-    if (status !== 'authenticated') return undefined
-    loadUnread()
-    // 60s is frequent enough to stay current without hammering the API.
-    const timer = setInterval(loadUnread, 60_000)
-    return () => clearInterval(timer)
-  }, [status, loadUnread])
+  const switchDemoUser = useCallback(async (userIdOrRole) => {
+    setStatus('loading')
+    try {
+      const res = await authApi.switchDemoUser(userIdOrRole)
+      setUser(res.data)
+      setStatus('authenticated')
+      loadUnread()
+      return res.data
+    } catch (err) {
+      setSessionError(err)
+      return null
+    }
+  }, [loadUnread])
 
   const login = useCallback(async (credentials) => {
-    const { data } = await authApi.login(credentials)
-    applySession(data)
-    return data.user
-  }, [applySession])
+    setStatus('loading')
+    const res = await authApi.login(credentials)
+    setUser(res.data.user)
+    setStatus('authenticated')
+    loadUnread()
+    return res.data.user
+  }, [loadUnread])
 
-  /**
-   * Registration creates the account but deliberately issues no session, so we
-   * sign in immediately afterwards to land the user on an authenticated page.
-   */
   const register = useCallback(async (payload) => {
-    const { data } = await authApi.register(payload)
-    const { data: session } = await authApi.login({
-      email: payload.email,
-      password: payload.password,
-    })
-    applySession(session)
-    return data.user
-  }, [applySession])
+    setStatus('loading')
+    const res = await authApi.register(payload)
+    setUser(res.data.user)
+    setStatus('authenticated')
+    loadUnread()
+    return res.data.user
+  }, [loadUnread])
 
   const logout = useCallback(async () => {
-    try {
-      await authApi.logout()
-    } catch {
-      // The local session must end even if the server call fails.
-    } finally {
-      clearSession()
-    }
-  }, [clearSession])
+    await authApi.logout()
+    setUser(null)
+    setUnreadCount(0)
+    setStatus('anonymous')
+  }, [])
+
+  const primaryRole = useMemo(() => getUserPrimaryRole(user), [user])
+  const isStaff = primaryRole === ROLES.ADMIN
 
   const value = useMemo(() => ({
-    user: { id: 1, name: 'Guest User', email: 'guest@example.com', roles: ['ADMIN'] },
-    status: 'authenticated',
-    sessionError: null,
-    unreadCount: 3,
-    refreshUnreadCount: () => {},
-    isAuthenticated: true,
-    isLoading: false,
-    isStaff: true,
-    login: async () => {},
-    register: async () => {},
-    logout: async () => {},
-    refreshUser: async () => {},
-  }), [])
+    user,
+    role: primaryRole,
+    status,
+    sessionError,
+    unreadCount,
+    refreshUnreadCount: loadUnread,
+    isAuthenticated: status === 'authenticated' && Boolean(user),
+    isLoading: status === 'loading',
+    isStaff,
+    switchDemoUser,
+    login,
+    register,
+    logout,
+    refreshUser: loadSession,
+  }), [user, primaryRole, status, sessionError, unreadCount, loadUnread, isStaff, switchDemoUser, login, register, logout, loadSession])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

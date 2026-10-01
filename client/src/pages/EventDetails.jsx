@@ -1,80 +1,194 @@
-import { Link } from 'react-router-dom'
-import { Card, Button, Badge, EmptyState } from '../components/ui.jsx'
+import { useEffect, useState } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { events } from '../services/api.js'
+import {
+  Alert, Badge, Button, Card, CardHeader, EmptyState, ErrorState, LoadingBlock,
+  Spinner, cx
+} from '../components/ui.jsx'
 
 export default function EventDetails() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [event, setEvent] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState(null)
+
+  async function loadEvent() {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await events.byId(id)
+      setEvent(res.data)
+      setLoading(false)
+    } catch (err) {
+      setError(err)
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadEvent()
+  }, [id])
+
+  async function handleRsvpToggle() {
+    if (!event) return
+    setBusy(true)
+    setMessage(null)
+    try {
+      if (event.hasRsvpd) {
+        const res = await events.cancelRsvp(event.id)
+        setMessage({ tone: 'info', text: res.message })
+      } else {
+        const res = await events.rsvp(event.id)
+        setMessage({ tone: 'success', text: res.message })
+      }
+      loadEvent()
+    } catch (err) {
+      setMessage({ tone: 'error', text: err.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (loading) {
+    return <Card><LoadingBlock rows={8} label="Loading event details" /></Card>
+  }
+
+  if (error || !event) {
+    return <Card><ErrorState error={error || new Error('Event not found')} onRetry={loadEvent} /></Card>
+  }
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <Link to="/events" className="text-sm text-swiss-muted hover:text-swiss-text flex items-center gap-2 mb-6 transition-colors">
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
-        Back to Events
-      </Link>
+    <div className="space-y-6">
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="text-xs font-mono tracking-widest text-swiss-muted hover:text-swiss-text uppercase"
+      >
+        &larr; BACK TO EVENTS
+      </button>
 
-      <div className="flex flex-col md:flex-row gap-8">
-        <div className="flex-1 space-y-6">
-          <header>
-            <div className="flex gap-2 mb-4">
-              <Badge tone="blue">WORKSHOP</Badge>
-              <Badge tone="slate">ONLINE</Badge>
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight text-swiss-text">React Performance Workshop</h1>
-            <p className="mt-4 text-lg text-swiss-muted leading-relaxed">
-              Join senior engineers from our alumni network as we deep dive into rendering optimizations, useMemo pitfalls, and concurrent mode in modern React applications.
-            </p>
-          </header>
+      {message && (
+        <Alert tone={message.tone} onDismiss={() => setMessage(null)}>
+          {message.text}
+        </Alert>
+      )}
 
-          <Card className="p-6">
-            <h2 className="text-sm font-bold uppercase font-mono tracking-widest border-b border-swiss-border pb-2 mb-4">About this Event</h2>
-            <div className="space-y-4 text-sm text-swiss-text leading-relaxed">
-              <p>This hands-on workshop is designed for developers who already know React but want to learn how to make their applications faster.</p>
-              <p>We'll cover:</p>
-              <ul className="list-disc pl-5 space-y-1 text-swiss-muted">
-                <li>Identifying render bottlenecks using React Profiler</li>
-                <li>When (and when not) to use useMemo and useCallback</li>
-                <li>Code-splitting strategies</li>
-                <li>State collocation</li>
-              </ul>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <h2 className="text-sm font-bold uppercase font-mono tracking-widest border-b border-swiss-border pb-2 mb-4">Attendees (45)</h2>
-            <EmptyState 
-              title="Attendees Hidden" 
-              description="Attendee list requires the Events API."
-            />
-            <p className="mt-4 text-center text-[10px] font-mono tracking-widest text-red-400 uppercase">
-              BACKEND DEPENDENCY: GET /events/:id/attendees
-            </p>
-          </Card>
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-swiss-border pb-6">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Badge tone={event.isVirtual ? 'blue' : 'green'}>
+              {event.isVirtual ? 'VIRTUAL EVENT' : 'IN-PERSON EVENT'}
+            </Badge>
+            <Badge tone="slate">{event.categoryLabel || event.category}</Badge>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-swiss-text">
+            {event.title}
+          </h1>
+          <p className="font-mono text-xs text-swiss-muted mt-2">
+            Organized by {event.organizer} · Date: {new Date(event.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at {event.time} - {event.endTime}
+          </p>
         </div>
 
-        <div className="w-full md:w-80 shrink-0 space-y-6">
-          <Card className="p-6">
-            <h2 className="text-sm font-bold uppercase font-mono tracking-widest mb-4">Details</h2>
-            <ul className="space-y-4 text-sm">
-              <li className="flex flex-col gap-1">
-                <span className="text-swiss-label font-mono text-[10px] uppercase">Date & Time</span>
-                <span className="text-swiss-text font-medium">Saturday, October 24</span>
-                <span className="text-swiss-muted">10:00 AM - 2:00 PM PST</span>
-              </li>
-              <li className="flex flex-col gap-1">
-                <span className="text-swiss-label font-mono text-[10px] uppercase">Location</span>
-                <span className="text-swiss-text font-medium">Zoom (Link provided upon RSVP)</span>
-              </li>
-              <li className="flex flex-col gap-1">
-                <span className="text-swiss-label font-mono text-[10px] uppercase">Host</span>
-                <span className="text-swiss-text font-medium">Rahul Sharma</span>
-                <span className="text-swiss-muted">Senior Frontend Engineer</span>
-              </li>
-            </ul>
-            <div className="mt-8 pt-6 border-t border-swiss-border space-y-3">
-              <Button className="w-full" disabled>RSVP Now</Button>
-              <Button variant="secondary" className="w-full" disabled>Add to Calendar</Button>
-              <p className="text-center text-[10px] font-mono tracking-widest text-red-400 uppercase mt-2">
-                BACKEND DEPENDENCY: POST /events/:id/rsvp
+        <div className="flex items-center gap-3">
+          <Button
+            size="lg"
+            variant={event.hasRsvpd ? "secondary" : "primary"}
+            disabled={busy}
+            onClick={handleRsvpToggle}
+          >
+            {busy ? <Spinner /> : event.hasRsvpd ? '&check; RSVP CONFIRMED (CANCEL)' : 'CONFIRM RSVP &rarr;'}
+          </Button>
+        </div>
+      </header>
+
+      <div className="grid gap-8 lg:grid-cols-3 items-start">
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader title="ABOUT THIS EVENT" />
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-swiss-text leading-relaxed whitespace-pre-line">
+                {event.description}
               </p>
+
+              {event.isVirtual && event.virtualLink && (
+                <div className="p-4 border border-blue-500/40 bg-blue-950/10 rounded-sm space-y-2">
+                  <p className="font-mono text-xs font-bold text-swiss-text uppercase tracking-wider">
+                    Virtual Meeting Access:
+                  </p>
+                  <p className="text-xs text-swiss-muted">
+                    This webinar is broadcast live via Zoom. Click below to launch the video auditorium:
+                  </p>
+                  <a
+                    href={event.virtualLink}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-block font-mono text-xs text-blue-400 underline font-semibold"
+                  >
+                    {event.virtualLink} &rarr;
+                  </a>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {event.speakers?.length > 0 && (
+            <Card>
+              <CardHeader title="SPEAKERS & KEYNOTE PANELISTS" />
+              <div className="divide-y divide-swiss-border">
+                {event.speakers.map((sp, idx) => (
+                  <div key={idx} className="p-5 flex items-center gap-4">
+                    <div className="h-10 w-10 flex items-center justify-center bg-swiss-border font-mono text-xs font-bold rounded-xs">
+                      0{idx + 1}
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-swiss-text">{sp.name}</p>
+                      <p className="text-xs text-swiss-muted">{sp.title}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* Sidebar Event Meta */}
+        <div className="space-y-6">
+          <Card className="p-6 space-y-4 font-mono text-xs">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-swiss-label">
+              EVENT LOGISTICS
+            </h3>
+            <div className="space-y-3 divide-y divide-swiss-border">
+              <div className="pt-2">
+                <span className="text-swiss-label uppercase text-[10px] block">Location / Venue:</span>
+                <span className="text-swiss-text font-medium">{event.location}</span>
+                {event.venueAddress && (
+                  <span className="text-swiss-muted block text-[11px] mt-0.5">{event.venueAddress}</span>
+                )}
+              </div>
+              <div className="pt-2">
+                <span className="text-swiss-label uppercase text-[10px] block">Capacity & Attendance:</span>
+                <span className="text-swiss-text font-medium">{event.attendeesCount || 0} Registered of {event.capacity} Max</span>
+              </div>
+              <div className="pt-2">
+                <span className="text-swiss-label uppercase text-[10px] block">Your Status:</span>
+                <span className={event.hasRsvpd ? "text-emerald-500 font-bold" : "text-swiss-muted"}>
+                  {event.hasRsvpd ? "RSVP CONFIRMED" : "NOT REGISTERED"}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-swiss-border">
+              <Button
+                variant={event.hasRsvpd ? "secondary" : "primary"}
+                className="w-full justify-center"
+                disabled={busy}
+                onClick={handleRsvpToggle}
+              >
+                {event.hasRsvpd ? 'Cancel Registration' : 'Register for Event'}
+              </Button>
             </div>
           </Card>
         </div>

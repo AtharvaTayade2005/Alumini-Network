@@ -3,38 +3,37 @@
 
 ### 1. Project Overview
 **Project name:** Alumni Network Portal
-**Project purpose:** A web-based alumni networking platform connecting alumni, students, and university administrators.
+**Project purpose:** A web-based alumni networking platform connecting alumni, students, faculty/professors, and university administrators.
 
 **Major Goals:**
 - Alumni networking & discovery
 - Professional networking & mentorship
 - Job opportunities and applications
 - Messaging and real-time notifications
-- Events and reunions (Planned)
-- Administrative management (Planned)
-- AI-powered career/networking functionality (Planned)
+- Events and reunions
+- Administrative management & moderation
+- Alumni giving and endowments
+- AI-powered career & networking intelligence
 
-**Intended User Classes:**
-- **ALUMNI**: Graduates who can mentor, post jobs, connect, and message.
-- **STUDENT**: Current students seeking connections, jobs, and mentorship.
-- **ADMIN / STAFF / MODERATOR**: University staff overseeing the platform, handling verifications, moderation, and audits.
+**Intended User Classes (4 Roles):**
+- **STUDENT**: Current students seeking mentorship, jobs, internships, career readiness, and guidance.
+- **ALUMNI**: Graduates mentoring, posting opportunities, networking, and contributing to endowment funds.
+- **PROFESSOR**: Faculty members advising students, coordinating campus research, and connecting with alumni.
+- **ADMIN**: University administration managing users, verifications, jobs, moderation, and audit trails.
 
 ---
 
-### 2. Current Project Status
+### 2. Current Project Status (Frontend-Only Phase Complete)
 
-- **Authentication / Registration**: IMPLEMENTED (JWT, bcrypt, Role-based)
-- **Profiles**: IMPLEMENTED (Education, experience, skills, privacy controls)
-- **Directory**: IMPLEMENTED (Search, filters)
-- **Connections**: IMPLEMENTED (Request, accept, decline, mutuals)
-- **Messaging**: IMPLEMENTED (Real-time via Socket.io)
-- **Notifications**: IMPLEMENTED (In-app feed)
-- **Jobs & Applications**: IMPLEMENTED (Post, apply, save, review candidates)
-- **Mentorship**: IMPLEMENTED (Requests, matching, completion)
-- **Events**: PLACEHOLDER (UI exists as `ComingSoon.jsx`, Backend NOT IMPLEMENTED)
-- **Admin**: PLACEHOLDER (UI exists as `ComingSoon.jsx`, Backend NOT IMPLEMENTED)
-- **Donations & Payments**: NOT IMPLEMENTED / PLANNED
-- **AI / Resume Parsing**: NOT IMPLEMENTED / PLANNED
+- **Role Architecture**: IMPLEMENTED (`STUDENT`, `ALUMNI`, `PROFESSOR`, `ADMIN` with centralized permissions and role-based navigation).
+- **Demo Role Switcher**: IMPLEMENTED (Instant simulation switcher in top toolbar).
+- **Mock Data Layer (`src/data/`)**: IMPLEMENTED (`users.js`, `students.js`, `alumni.js`, `professors.js`, `jobs.js`, `applications.js`, `mentorshipRequests.js`, `conversations.js`, `events.js`, `notifications.js`, `resumes.js`, `donations.js`, `announcements.js`, `analytics.js`).
+- **Mock Service Layer (`src/services/`)**: IMPLEMENTED (`auth.service.js`, `user.service.js`, `directory.service.js`, `jobs.service.js`, `mentorship.service.js`, `events.service.js`, `messaging.service.js`, `notification.service.js`, `resume.service.js`, `donation.service.js`, `announcement.service.js`, `admin.service.js`, `ai.service.js`).
+- **Student Experience**: IMPLEMENTED (Dashboard, Profile, Directory, Mentorship, Jobs, Applications, Events, Messages, Notifications, Resume with ATS Intelligence, AI Assistant).
+- **Alumni Experience**: IMPLEMENTED (Dashboard, Profile, Directory, Mentorship Requests & Mentees, Jobs & Applicant Review, Events, Donations with 80G Receipts, Messages, AI Assistant).
+- **Professor Experience**: IMPLEMENTED (Dashboard, Profile, Students Guidance Roster, Alumni Directory, Announcements, Events, Messages).
+- **Admin Experience**: IMPLEMENTED (Dashboard KPIs, User Management, Alumni Verification Queue, Job Moderation, Event Management, Donations Audit, Analytics, Immutable Security Audit Logs).
+- **UI / Swiss Design System**: IMPLEMENTED & PRESERVED (Strict 1px borders, typography hierarchy, monospace accents, zero arbitrary shadows, dark/light contrast).
 
 ---
 
@@ -223,22 +222,32 @@ Groups:
 
 ---
 
-### 17. Frontend Pages
-- **Home**: Landing page. Status: IMPLEMENTED (Phase 1 UI Complete / Swiss redesign applied).
-- **Dashboard**: Stats and quick links. Status: IMPLEMENTED (Phase 1 UI Complete / Swiss redesign applied).
-- **Directory**: Member search. Status: IMPLEMENTED (Phase 1 UI Complete / Swiss redesign applied).
-- **Jobs**: Job board + applications. Status: IMPLEMENTED (Phase 1 UI Complete / Swiss redesign applied).
-- **Mentorship**: Mentorship matching. Status: IMPLEMENTED (Phase 1 UI Complete / Swiss redesign applied).
-- **Messages**: Real-time chat. Status: IMPLEMENTED (Phase 1 UI Complete / Swiss redesign applied).
-- **Profile / AlumniProfile**: User editing. Status: IMPLEMENTED (Phase 1 UI Complete / Swiss redesign applied).
-- **Login / Register**: Auth flow. Status: IMPLEMENTED (Phase 1 UI Complete / Swiss redesign applied).
-- **Notifications**: In-app notifications. Status: IMPLEMENTED (Phase 1 UI Complete / Swiss redesign applied).
+### 17. Frontend Pages Inventory
+- **Home (`Home.jsx`)**: Public showcase and landing page.
+- **Dashboard (`Dashboard.jsx`)**: Role-tailored live overview with KPI tiles for Student, Alumni, Professor, and Admin.
+- **Directory (`Directory.jsx`)**: Full member search with filters by graduation year, industry, skills, mentorship flag.
+- **AlumniProfile (`AlumniProfile.jsx`)**: Detailed graduate identity, timeline, verification badges, and connection actions.
+- **Profile (`Profile.jsx`)**: Profile editing, skills management, and granular privacy controls.
+- **Jobs (`Jobs.jsx`)**: Multi-view job board, company view, applicant review, saved jobs, and application tracker.
+- **Mentorship (`Mentorship.jsx`)**: Mentor discovery, mentorship requests (incoming/outgoing), and active mentorship management.
+- **Resume (`Resume.jsx`)**: Student resume management, PDF upload, parsed technical skills, and AI ATS readiness scanner.
+- **Donations (`Donations.jsx`)**: Alumni giving portal with endowment funds, preset giving tiers, and official 80G tax receipts.
+- **Students (`Students.jsx`)**: Faculty advising roster for professors to inspect student projects and recommend opportunities.
+- **Announcements (`Announcements.jsx`)**: Department and university-wide bulletin broadcast with audience filters.
+- **Events (`Events.jsx` & `EventDetails.jsx`)**: Event calendar, RSVP / cancel RSVP, and event creation with Zoom links.
+- **Messages (`Messages.jsx`)**: Real-time mock direct messaging with persistent conversation history and read receipts.
+- **Notifications (`Notifications.jsx`)**: In-app notifications with mark as read and delete actions.
+- **Admin Console (`Admin.jsx`)**: System KPIs, User governance, Alumni verification queue, Job moderation, Events management, Donations audit, Analytics, and Security audit logs.
+- **AI Career Intelligence**: `Assistant.jsx` (Chat advisor), `JobReadiness.jsx` (Skill match audit), `ResumeAnalyzer.jsx` (ATS scanner), `SemanticSearch.jsx` (Embeddings-based search).
+- **Settings (`Settings.jsx`)**: Account preferences, email notifications, and password security.
+- **System Screens (`SystemScreens.jsx`)**: 403 Forbidden (with quick role switch simulation), 401 Unauthorized, 500 Server Error, Offline, Maintenance, and 404 Not Found.
 
 ---
 
-### 18. Mock / Placeholder Features
-- **Events (`Events.jsx`)**: Renders `ComingSoon.jsx`. No real API data.
-- **Admin (`Admin.jsx`)**: Renders `ComingSoon.jsx`. No real API data.
+### 18. Mock Data & Service Architecture
+- **Mock DB (`src/data/`)**: Modular entities with local storage persistence across user sessions.
+- **Service Layer (`src/services/`)**: Isolated API abstraction modules ready for seamless drop-in REST API backend connectivity.
+- **Role Simulation**: Centralized in `AuthContext.jsx` and `RoleSwitcher.jsx` for 1-click role toggling during QA.
 
 ---
 

@@ -1,59 +1,155 @@
-import { mockUsers, mockJobs, mockEvents } from '../data/mock-db.js'
+import { authService } from './auth.service.js'
+import { userService } from './user.service.js'
+import { directoryService } from './directory.service.js'
+import { jobsService } from './jobs.service.js'
+import { eventsService } from './events.service.js'
+import { mentorshipService } from './mentorship.service.js'
+import { messagingService } from './messaging.service.js'
+import { notificationService } from './notification.service.js'
+import { resumeService } from './resume.service.js'
+import { aiService } from './ai.service.js'
+import { donationService } from './donation.service.js'
+import { adminService } from './admin.service.js'
+import { announcementService } from './announcement.service.js'
 
 export const auth = {
-  register: async (payload) => ({ data: { user: mockUsers[3] } }),
-  login: async (payload) => ({ data: { user: mockUsers[3], accessToken: 'mock' } }),
-  logout: async () => {},
-  me: async () => ({ data: mockUsers[3] }),
+  login: (creds) => authService.login(creds),
+  register: (data) => authService.register(data),
+  logout: () => authService.logout(),
+  me: () => authService.me(),
+  getSession: () => authService.getSession(),
+  switchDemoUser: (id) => authService.switchDemoUser(id),
+  getDemoUsers: () => authService.getDemoUsers(),
 }
 
 export const profiles = {
-  me: async () => ({ data: mockUsers[3] }),
-  byId: async (userId) => ({ data: mockUsers.find(u => u.id === userId) || mockUsers[0] }),
-  skills: async (userId) => ({ data: mockUsers.find(u => u.id === userId)?.skills || [] }),
+  me: () => userService.getProfile(),
+  byId: (id) => userService.getProfile(id),
+  updateMe: (data) => userService.updateProfile(data),
+  skills: (id) => userService.getProfile(id).then((res) => ({ data: res.data.skills })),
+  privacy: () => userService.getPrivacy(),
+  updatePrivacy: (data) => userService.updatePrivacy(data),
 }
 
 export const directory = {
-  search: async (params) => ({ data: mockUsers, meta: { total: mockUsers.length, page: 1, pages: 1 } }),
-  filters: async () => ({ data: { graduationYears: [2026, 2023, 2021, 2018], industries: ['Technology', 'E-commerce'], countries: ['India'] } }),
+  search: (params) => directoryService.search(params),
+  filters: () => directoryService.getFilters(),
+  byId: (id) => directoryService.getById(id),
 }
 
 export const jobs = {
-  list: async (params) => ({ data: mockJobs, meta: { total: mockJobs.length, page: 1, pages: 1 } }),
-  byId: async (id) => ({ data: mockJobs.find(j => j.id === id) || mockJobs[0] }),
-  saved: async () => ({ data: [] }),
-  myApplications: async () => ({ data: [] }),
+  list: (params) => jobsService.list(params),
+  byId: (id) => jobsService.byId(id),
+  company: (id) => jobsService.company(id),
+  create: (data) => jobsService.create(data),
+  save: (id) => jobsService.save(id),
+  unsave: (id) => jobsService.unsave(id),
+  saved: (params) => jobsService.saved(params),
+  apply: (id, data) => jobsService.apply(id, data),
+  myApplications: (params) => jobsService.myApplications(params),
+  applicationsForJob: (id, params) => jobsService.applicationsForJob(id, params),
+  review: (jobId, appId, status) => jobsService.review(jobId, appId, status),
+  withdraw: (appId) => jobsService.withdraw(appId),
 }
 
 export const events = {
-  list: async () => ({ data: mockEvents, meta: { total: mockEvents.length } }),
-  byId: async (id) => ({ data: mockEvents.find(e => e.id === id) || mockEvents[0] })
+  list: (params) => eventsService.list(params),
+  byId: (id) => eventsService.byId(id),
+  rsvp: (id) => eventsService.rsvp(id),
+  cancelRsvp: (id) => eventsService.cancelRsvp(id),
+  create: (data) => eventsService.create(data),
+}
+
+export const mentorship = {
+  mentors: (params) => mentorshipService.getMentors(params),
+  requests: (params) => mentorshipService.getRequests(params),
+  request: (data) => mentorshipService.request(data),
+  respond: (id, data) => mentorshipService.respond(id, data),
+  cancel: (id) => mentorshipService.cancel(id),
+  mentorships: (params) => mentorshipService.getMentorships(params),
+  complete: (id) => mentorshipService.complete(id),
+  end: (id) => mentorshipService.end(id),
+}
+
+export const messages = {
+  conversations: () => messagingService.getConversations(),
+  withPeer: (id) => messagingService.getThread(id),
+  send: (id, body) => messagingService.sendMessage(id, body),
+}
+
+export const notifications = {
+  list: (params) => notificationService.list(params),
+  unreadCount: () => notificationService.unreadCount(),
+  markRead: (id) => notificationService.markRead(id),
+  markAllRead: () => notificationService.markAllRead(),
+  remove: (id) => notificationService.remove(id),
+}
+
+export const resumes = {
+  get: (id) => resumeService.getResume(id),
+  upload: (data) => resumeService.uploadResume(data),
+  delete: (id) => resumeService.deleteResume(id),
+}
+
+export const ai = {
+  chat: (prompt) => aiService.askAssistant(prompt),
+  readiness: (role) => aiService.analyzeJobReadiness(role),
+  analyzeResume: (text) => aiService.analyzeResume(text),
+  search: (query) => aiService.getSemanticSearch(query),
+}
+
+export const donations = {
+  funds: () => donationService.getFunds(),
+  history: (id) => donationService.getHistory(id),
+  all: () => donationService.getAllDonations(),
+  donate: (data) => donationService.donate(data),
+}
+
+export const announcements = {
+  list: (params) => announcementService.list(params),
+  create: (data) => announcementService.create(data),
+  update: (id, data) => announcementService.update(id, data),
+  remove: (id) => announcementService.remove(id),
+}
+
+export const admin = {
+  metrics: () => adminService.getDashboardMetrics(),
+  users: (params) => adminService.getUsers(params),
+  verify: (id, approved, notes) => adminService.verifyAlumni(id, approved, notes),
+  updateRole: (id, role) => adminService.updateUserRole(id, role),
+  moderateJob: (id, action) => adminService.moderateJob(id, action),
+  auditLogs: (params) => adminService.getAuditLogs(params),
 }
 
 export const connections = {
   list: async () => ({ data: [] }),
-  pending: async () => ({ data: [] }),
-  stats: async () => ({ data: { connections: 12, pending: 2 } }),
+  pending: async () => ({
+    data: [
+      {
+        id: 'conn_req_1',
+        peer: { id: 'u_alumni_2', name: 'Neha Kapoor', avatarUrl: null },
+        direction: 'incoming',
+      },
+    ],
+  }),
+  stats: async () => ({ data: { connections: 18, pending_received: 1, pending_sent: 2 } }),
   status: async () => ({ data: { status: 'none' } }),
-  mutuals: async () => ({ data: [] }),
-}
-
-export const messages = {
-  conversations: async () => ({ data: [] }),
-  withPeer: async () => ({ data: [] }),
-}
-
-export const mentorship = {
-  mentors: async () => ({ data: mockUsers.filter(u => u.openToMentor), meta: { total: 2, page: 1, pages: 1 } }),
-  requests: async () => ({ data: [] }),
-  mentorships: async () => ({ data: [] }),
-}
-
-export const notifications = {
-  list: async () => ({ data: [], meta: { unread: 3 } }),
-  unreadCount: async () => ({ data: { count: 3 } }),
+  request: async (userId, note) => ({ message: 'Connection request sent' }),
+  respond: async (id, action) => ({ message: `Connection ${action}ed` }),
+  remove: async (id) => ({ message: 'Connection removed' }),
 }
 
 export const oauth = {
-  providers: async () => ({ data: { providers: [] } }),
+  providers: async () => ({
+    data: {
+      providers: [
+        { provider: 'google', label: 'Google Workspace' },
+        { provider: 'linkedin', label: 'LinkedIn Learning' },
+      ],
+    },
+  }),
+  startUrl: (p) => '#',
+  linkUrl: (p) => '#',
+  accounts: async () => ({ data: { accounts: [], providers: [] } }),
+  unlink: async () => ({ message: 'Unlinked' }),
 }
